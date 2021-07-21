@@ -51,17 +51,29 @@ g4 = g4.rename(columns={'Strokes Above Par': 'R4'})
 
  
 #Merge individual rounds
-merge_rounds = pd.merge(us_pga_2020, g1, left_on=['player id'], right_index=True)
-merge_rounds = pd.merge(merge_rounds, g2, left_on=['player id'], right_index=True)
-merge_rounds = pd.merge(merge_rounds, g3, left_on=['player id'], right_index=True)
-merge_rounds = pd.merge(merge_rounds, g4, left_on=['player id'], right_index=True)
+merge_rounds = pd.merge(us_pga_2020, g1, left_on=['player id'], right_index=True,how='left')
+merge_rounds = pd.merge(merge_rounds, g2, left_on=['player id'], right_index=True,how='left')
+merge_rounds = pd.merge(merge_rounds, g3, left_on=['player id'], right_index=True,how='left')
+merge_rounds = pd.merge(merge_rounds, g4, left_on=['player id'], right_index=True,how='left')
+
+
+#Plot Distribution of Round 1 scores to Par
+
+import seaborn as sns
+
+r1_graph = sns.displot(merge_rounds,x='R1',kind='kde',fill=True)
+r2_graph = sns.displot(merge_rounds,x='R2',kind='kde',fill=True)
+
+#Equation
+#Poisson Distribution
+# Round Score = Par of Course (Fixed) 
+#+ Course Difficulty Effect (Fixed for all players) + Round(Fixed for all players)
+#+ Player skill(Normal) + Made Cut after Round 2 + Stokes Gained
 
 
 
 
 
-#Jon Rahm finished 6 under
-#3.78 strokes gained (better than tour average)
 
 
 
