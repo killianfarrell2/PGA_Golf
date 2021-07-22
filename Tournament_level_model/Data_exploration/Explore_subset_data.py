@@ -38,23 +38,58 @@ R4 = us_pga_2020_hole[us_pga_2020_hole['round']==4]
 
 #Break out into rounds
 g1 = pd.DataFrame(R1.groupby(['player id'])['Strokes Above Par'].sum())
-g1 = g1.rename(columns={'Strokes Above Par': 'R1'})
+g1 = g1.rename(columns={'Strokes Above Par': 'Round_Score'})
+g1['Round'] = 1
 
 g2 = pd.DataFrame(R2.groupby(['player id'])['Strokes Above Par'].sum())
-g2 = g2.rename(columns={'Strokes Above Par': 'R2'})
+g2 = g2.rename(columns={'Strokes Above Par': 'Round_Score'})
+g2['Round'] = 2
 
 g3 = pd.DataFrame(R3.groupby(['player id'])['Strokes Above Par'].sum())
-g3 = g3.rename(columns={'Strokes Above Par': 'R3'})
+g3 = g3.rename(columns={'Strokes Above Par': 'Round_Score'})
+g3['Round'] = 3
 
 g4 = pd.DataFrame(R4.groupby(['player id'])['Strokes Above Par'].sum())
-g4 = g4.rename(columns={'Strokes Above Par': 'R4'})
+g4 = g4.rename(columns={'Strokes Above Par': 'Round_Score'})
+g4['Round'] = 4
 
  
 #Merge individual rounds
-merge_rounds = pd.merge(us_pga_2020, g1, left_on=['player id'], right_index=True,how='left')
-merge_rounds = pd.merge(merge_rounds, g2, left_on=['player id'], right_index=True,how='left')
-merge_rounds = pd.merge(merge_rounds, g3, left_on=['player id'], right_index=True,how='left')
-merge_rounds = pd.merge(merge_rounds, g4, left_on=['player id'], right_index=True,how='left')
+merge_1 = pd.merge(us_pga_2020, g1, left_on=['player id'], right_index=True,how='left')
+merge_2 = pd.merge(us_pga_2020, g2, left_on=['player id'], right_index=True,how='left')
+merge_3 = pd.merge(us_pga_2020, g3, left_on=['player id'], right_index=True,how='left')
+merge_4 = pd.merge(us_pga_2020, g4, left_on=['player id'], right_index=True,how='left')
+
+
+#Union Dataframes
+union = pd.concat([merge_1, merge_2, merge_3,merge_4])
+#Get total round score
+union['Round_total'] = union['round_par'] + union['Round_Score']
+
+#Rename column
+union = union.rename(columns={"player id": "player_id"})
+
+
+#Downgraded Arviz to 0.11.
+import pymc3 as pm
+import arviz as az
+import matplotlib.pyplot as plt
+
+#Gaussian Inference - fat right tail
+az.plot_kde(union['Round_total'].values, rug=True)
+plt.yticks([1], alpha=0);
+
+
+with pm.Model() as model:
+    # global model parameters
+    sd_att = pm.HalfStudentT("sd_att", nu=3, sigma=2.5)
+    sd_def = pm.HalfStudentT("sd_def", nu=3, sigma=2.5)
+
+
+#Set cores to 1
+with model:
+    trace = pm.sample(1000, tune=1000, cores=1)
+
 
 
 #Plot Distribution of Round 1 scores to Par
