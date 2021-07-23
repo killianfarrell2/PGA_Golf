@@ -66,8 +66,17 @@ union = pd.concat([merge_1, merge_2, merge_3,merge_4])
 #Get total round score
 union['Round_total'] = union['round_par'] + union['Round_Score']
 
-#Rename column
-union = union.rename(columns={"player id": "player_id"})
+#Drop column player id - Can't use golfer ID - get index 9621 is out of bounds error
+union = union.drop(columns=['player id'])
+
+# Create new column i_golfer
+golfers = union.player.unique()
+golfers = pd.DataFrame(golfers, columns=["golfer"])
+golfers["i"] = golfers.index
+
+# Add i column back to dataframe
+union = pd.merge(union, golfers, left_on="player", right_on="golfer", how="left")
+union = union.rename(columns={"i": "i_golfer"}).drop("golfer", 1)
 
 
 #Downgraded Arviz to 0.11.
@@ -79,11 +88,29 @@ import matplotlib.pyplot as plt
 az.plot_kde(union['Round_total'].values, rug=True)
 plt.yticks([1], alpha=0);
 
+#Set values
+golfers = union.i_golfer.values
+golf_round = union.Round.values
+observed_round_score = union.Round_total.values
+
+#Get unique number of golfers
+num_golfers = len(union.i_golfer.drop_duplicates())
+
+import theano.tensor as tt
 
 with pm.Model() as model:
     # global model parameters
     sd_att = pm.HalfStudentT("sd_att", nu=3, sigma=2.5)
-    sd_def = pm.HalfStudentT("sd_def", nu=3, sigma=2.5)
+
+    # golfer specific
+    atts_star = pm.Normal("atts_star", mu=0, sigma=sd_att, shape=num_golfers)
+    #Sum to zero constraint
+    atts = pm.Deterministic("atts", atts_star - tt.mean(atts_star))
+    
+    golfer_theta = tt.exp(atts[golfers])
+    
+    # likelihood of observed data
+    golfer_score = pm.Poisson("golfer_score", mu=golfer_theta, observed=observed_round_score)
 
 
 #Set cores to 1
