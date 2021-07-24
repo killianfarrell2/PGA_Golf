@@ -11,6 +11,8 @@ data_location = 'D:\\KF_Repo\\PGA_Golf\\Tournament_level_model\\Data_manipulatio
 union = pd.read_csv(data_location)
 
 
+
+
 #Set values
 observed_golfers = union.i_golfer.values
 observed_golf_round = union.Round.values
