@@ -156,7 +156,7 @@ with model:
 df_trace = pm.trace_to_dataframe(trace)
 
 
-#Plot P{osterior of specific player} - Poisson gives much wider distribution than normal
+#Plot Posterior of specific player - Poisson gives much wider distribution than normal
 pm.plot_posterior(trace['golfer_star'][0])
 
 #Get summary statistics for each golfer
