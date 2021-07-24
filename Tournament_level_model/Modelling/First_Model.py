@@ -10,6 +10,26 @@ import numpy as np
 data_location = 'D:\\KF_Repo\\PGA_Golf\\Tournament_level_model\\Data_manipulation\\model_data.csv'
 union = pd.read_csv(data_location)
 
+#Drop column player id - Can't use golfer ID - get index 9621 is out of bounds error
+union = union.drop(columns=['player id'])
+
+# Create new column i_golfer
+golfers = union.player.unique()
+golfers = pd.DataFrame(golfers, columns=["golfer"])
+golfers["i"] = golfers.index
+
+# Add i column back to dataframe
+union = pd.merge(union, golfers, left_on="player", right_on="golfer", how="left")
+union = union.rename(columns={"i": "i_golfer"}).drop("golfer", 1)
+
+# Create new column i_course
+courses = union.course.unique()
+courses = pd.DataFrame(courses, columns=["course"])
+courses["i"] = courses.index
+
+# Add i column back to dataframe
+union = pd.merge(union, courses, left_on="course", right_on="course", how="left")
+union = union.rename(columns={"i": "i_course"})
 
 
 
@@ -17,7 +37,7 @@ union = pd.read_csv(data_location)
 observed_golfers = union.i_golfer.values
 observed_golf_round = union.Round.values
 observed_round_score = union.Round_total.values
-observed_round_par = union.round_par.values
+observed_round_par = union.par.values
 observed_courses = union.i_course.values
 
 #Get unique number of golfers

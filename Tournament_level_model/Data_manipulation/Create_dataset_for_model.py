@@ -24,13 +24,10 @@ def groupby_hole(Round):
     groupby_df['Round'] = Round
     return groupby_df
 
-    
 g1 = groupby_hole(1)
 g2 = groupby_hole(2)
 g3 = groupby_hole(3)
 g4 = groupby_hole(4)
-
-
 
 #Merge individual rounds
 merge_1 = pd.merge(tournament_data, g1, left_on=['tournament id','player id'], right_index=True,how='inner')
@@ -44,29 +41,5 @@ union = pd.concat([merge_1, merge_2, merge_3,merge_4])
 #Get total round score
 union['Round_total'] = union['par'] + union['Round_Score']
 
-
-#Drop column player id - Can't use golfer ID - get index 9621 is out of bounds error
-union = union.drop(columns=['player id'])
-
-# Create new column i_golfer
-golfers = union.player.unique()
-golfers = pd.DataFrame(golfers, columns=["golfer"])
-golfers["i"] = golfers.index
-
-# Add i column back to dataframe
-union = pd.merge(union, golfers, left_on="player", right_on="golfer", how="left")
-union = union.rename(columns={"i": "i_golfer"}).drop("golfer", 1)
-
-
-# Create new column i_course
-courses = union.course.unique()
-courses = pd.DataFrame(courses, columns=["course"])
-courses["i"] = courses.index
-
-# Add i column back to dataframe
-union = pd.merge(union, courses, left_on="course", right_on="course", how="left")
-union = union.rename(columns={"i": "i_course"})
-
-  
 #Save file as csv
 union.to_csv('D:\\KF_Repo\\PGA_Golf\\Tournament_level_model\\Data_manipulation\\model_data.csv', index=False)
