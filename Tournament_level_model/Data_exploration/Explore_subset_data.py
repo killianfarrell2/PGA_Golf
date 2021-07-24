@@ -12,6 +12,12 @@
 #Stokes gained ball striking = sg ott + sg app
 
 import pandas as pd
+#Downgraded Arviz to 0.11.
+import pymc3 as pm
+import arviz as az
+import matplotlib.pyplot as plt
+import theano.tensor as tt
+import numpy as np
 
 #Import Tournament data
 tournament_location = 'D:\\KF_Repo\\PGA_Golf\\Tournament_level_model\\Data_manipulation\\PGA_subset.csv'
@@ -62,6 +68,8 @@ union = pd.concat([merge_1, merge_2, merge_3,merge_4])
 #Get total round score
 union['Round_total'] = union['round_par'] + union['Round_Score']
 
+
+
 #Drop column player id - Can't use golfer ID - get index 9621 is out of bounds error
 union = union.drop(columns=['player id'])
 
@@ -77,25 +85,32 @@ union = union.rename(columns={"i": "i_golfer"}).drop("golfer", 1)
 
 # create a group using groupby
 g_obs = union.groupby("player")['hole_par'].count()
+
+
+# Create new column i_course
+courses = union.course.unique()
+courses = pd.DataFrame(courses, columns=["course"])
+courses["i"] = courses.index
+
+# Add i column back to dataframe
+union = pd.merge(union, courses, left_on="course", right_on="course", how="left")
+union = union.rename(columns={"i": "i_course"})
+
   
-
-
-#Downgraded Arviz to 0.11.
-import pymc3 as pm
-import arviz as az
-import matplotlib.pyplot as plt
-
-#Gaussian Inference - fat right tail
-az.plot_kde(union['Round_total'].values, rug=True)
+#Gaussian Inference for score to par
+az.plot_kde(union['Round_Score'].values, rug=True)
 plt.yticks([1], alpha=0);
 
 #Set values
-golfers = union.i_golfer.values
-golf_round = union.Round.values
+observed_golfers = union.i_golfer.values
+observed_golf_round = union.Round.values
 observed_round_score = union.Round_total.values
+observed_round_par = union.round_par.values
+observed_courses = union.i_course.values
 
 #Get unique number of golfers
 num_golfers = len(union.i_golfer.drop_duplicates())
+num_courses = len(union.i_course.drop_duplicates())
 
 #Drop dataframes
 R1.drop(R1.index, inplace=True)
@@ -107,20 +122,26 @@ merge_2.drop(merge_2.index, inplace=True)
 merge_3.drop(merge_3.index, inplace=True)
 merge_4.drop(merge_4.index, inplace=True)
 
-import theano.tensor as tt
-
 
 #Normal Distribution - gives output of decimal numbers - we need whole numbers
-#Poisson Distribution not acceptable as mean is not equal to variance
+#Poisson Distribution - is discreet but may not be accurate
 
+#+ course_star[observed_courses] - made model unstable
+# addming in mu golfer brought divergences - seems to be less of a range too
+# golfers mean are shrunk toward mu_golfer
+# Testing against test set would be the best approach
 with pm.Model() as model:
-    # global model parameters
-    sd_att = pm.HalfStudentT("sd_att", nu=3, sigma=2.5)
-
+    # global model parameters - all golfers have same sd_att now
+    sd_golfer = pm.HalfStudentT("sd_golfer", nu=3, sigma=2.5)
+    #mu can be different to 0 now depending on the data
+    mu_golfer = pm.Normal("mu_golfer", mu=0, sigma=5)
+    #sd_course = pm.HalfStudentT("sd_course", nu=3, sigma=2.5)
     # golfer specific
-    atts_star = pm.Normal("atts_star", mu=72, sigma=sd_att, shape=num_golfers)
-   
-    golfer_theta = atts_star[golfers]
+    golfer_star = pm.Normal("golfer_star", mu=mu_golfer, sigma=sd_golfer, shape=num_golfers)
+    
+    #Course specific
+    #course_star = pm.Normal("course_star", mu=0, sigma=sd_course, shape=num_courses)
+    golfer_theta = observed_round_par + golfer_star[observed_golfers] 
     
     # likelihood of observed data
     golfer_score = pm.Poisson("golfer_score", mu=golfer_theta, observed=observed_round_score)
@@ -129,14 +150,35 @@ with pm.Model() as model:
 
 #Set cores to 1
 with model:
-    trace = pm.sample(2000, tune=2000, cores=1)
+    trace = pm.sample(1000, tune=1000, cores=1)
 
 # Create dataframe with trace
 df_trace = pm.trace_to_dataframe(trace)
 
 
-#Plot P{osterior of specific player}
-pm.plot_posterior(trace['atts_star'][0])
+#Plot P{osterior of specific player} - Poisson gives much wider distribution than normal
+pm.plot_posterior(trace['golfer_star'][0])
+
+#Get summary statistics for each golfer
+
+
+hpd = pd.DataFrame(pm.stats.hpd(trace["golfer_star"]))
+hpd = hpd.rename(columns={0: "2.5%",1:"97.5%"})
+
+mid = pd.DataFrame(np.quantile(trace["golfer_star"], 0.5, axis=0))
+mid = mid.rename(columns={0: "50%"})
+
+g_count = pd.DataFrame(union.groupby("i_golfer")['hole_par'].count())
+g_count = g_count.rename(columns={"hole_par": "Count_rounds"})
+
+
+#Combine golfers
+golfer_stats = pd.merge(golfers, hpd, left_on="i", right_index=True, how="left")
+golfer_stats = pd.merge(golfer_stats, mid , left_on="i", right_index=True, how="left")
+golfer_stats = pd.merge(golfer_stats, g_count , left_on="i", right_index=True, how="left")
+
+
+
 
 #Right now output is decimal number - but we need round numbers
 with model:
