@@ -79,17 +79,20 @@ num_courses = len(training_data.i_course.drop_duplicates())
 
 with pm.Model() as model:
     
-    #Global model parameters - all golfers have same sd
-    #sd_global = pm.HalfStudentT("sd_global", nu=3, sigma=2.5)
-    #mean_global = pm.Normal('mean_global', mu=0, sigma=3)
-    #intercept = pm.Normal('intercept', mu=0, sigma=3)
-
+    #Hyper Priors
+    mean_golfer_sd  = pm.HalfCauchy('mean_golfer_sd', beta=1)
+    mean_golfer_mu = pm.Normal('mean_golfer_mu', mu=0, sigma=1)
+   
     # golfer specific parameters
-    mean_golfer = pm.Normal('mean_golfer', mu=0, sigma=3, shape=num_golfers)
-    sd_golfer = pm.HalfStudentT("sd_golfer", nu=3, sigma=2.5, shape=num_golfers)
+    mean_golfer = pm.Normal('mean_golfer', mu=mean_golfer_mu, sigma=mean_golfer_sd, shape=num_golfers)
+    #sd_golfer = pm.HalfCauchy("sd_golfer", nu=3, sigma=2.5, shape=num_golfers)
+    
+    #Model Error - deviation of observed value from true value
+    eps = pm.HalfCauchy('eps', beta=1)
          
     # Observed scores to par follow normal distribution
-    golfer_to_par = pm.Normal("golfer_to_par", mu=mean_golfer[observed_golfers_shared], sigma=sd_golfer[observed_golfers_shared], observed=observed_round_score)
+    golfer_to_par = pm.Normal("golfer_to_par", mu=mean_golfer[observed_golfers_shared], sigma=eps, observed=observed_round_score)
+    #golfer_to_par = pm.Normal("golfer_to_par", mu=mean_golfer[observed_golfers_shared], sigma=sd_golfer[observed_golfers_shared], observed=observed_round_score)
     
    
 #Set cores to 1
@@ -129,10 +132,11 @@ pm.plot_posterior(trace['mean_golfer'][0])
 
 # Sample Posterior predictive
 with model:
-    pp_train = pm.sample_posterior_predictive(trace,samples=100)
-    
-pp_train["golfer_to_par"].shape
+    pp_train = pm.sample_posterior_predictive(trace,samples=1000)
 
+#Plot Posterior Distribution
+az.plot_ppc(az.from_pymc3(posterior_predictive=pp_train, model=model));
+    
 
 # Round scores to the nearest whole number
 pp_train_rounded = {'golfer_to_par': pp_train['golfer_to_par'].round(0)}

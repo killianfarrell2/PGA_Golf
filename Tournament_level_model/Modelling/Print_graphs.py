@@ -17,19 +17,122 @@ data = pd.read_csv(data_location)
 az.plot_kde(data['Round_Score'].values, rug=True)
 plt.yticks([0], alpha=0);
 
+import matplotlib.pyplot as plt
+
+mu_graph = data['Round_Score'].mean()
+print(mu_graph)
+std_graph = data['Round_Score'].std()
+print(std_graph)
+min_score = data['Round_Score'].min()
+print(min_score)
+max_score =data['Round_Score'].max()
+print(max_score)
+
+import matplotlib.pyplot as plt
+from scipy.stats import norm
+import statistics
+    
+# Plot between -30 and 30 with
+# 0.1 steps.
+x_axis = np.arange(-15, 15, 0.1)
+    
+
+    
+plt.plot(x_axis, norm.pdf(x_axis, mu_graph, std_graph))
+plt.show()
+
+# the histogram of the data vs Normal Distribution
+
+plt.hist(data['Round_Score'].values, 20, density=True, facecolor='b', alpha=0.75)
+plt.plot(x_axis, norm.pdf(x_axis, mu_graph, std_graph))
+plt.xlabel('Score to Par')
+plt.ylabel('Probability')
+plt.title('Histogram of golfer round scores to par')
+plt.text(0, 0.15, r'$\mu=-0.68,\ \sigma=3.2$')
+plt.xlim(-15, 15)
+plt.ylim(0, 0.20)
+plt.grid(True)
+plt.show()
+    
+
+import statsmodels.api as sm
+from scipy.stats import norm
+import pylab
+
+#Theoretical Quantiles on X-axis - mean = 0 sd = 1
+# Ordered value for random variable on the y axis
+# Mas score is 16 over, Min Score is -12
+# This indicates that there is fat tails
+
+my_data = data['Round_Score']
+sm.qqplot(my_data, line='45')
+pylab.show()
+
+# K-S test
+from scipy.stats import kstest, norm
+my_data = data['Round_Score']
+ks_statistic, p_value = kstest(my_data, 'norm')
+print(ks_statistic, p_value)
+
+# If Value of K-s = 0 then we assume it is Normal
+# Our K-S is 0.39 and p value is 0.0 - needs to be greater than 0.05
+
+
+
+
+
+
 #Get mean and standard deviations of all round scores to par
 round_score_mean = np.mean(data['Round_Score'].values)
 round_score_std = np.std(data['Round_Score'].values)
 print('mean score:',round_score_mean)
 print('std score:',round_score_std)
+
 #Select Jon Rahm
 jon_rahm = data[data['player']=='Jon Rahm']
+rahm_mean = np.mean(jon_rahm['Round_Score'].values)
+rahm_std = np.std(jon_rahm['Round_Score'].values)
+print('mean score:',rahm_mean)
+print('std score:',rahm_std)
 
-# Plot Jon Rahm - sd -2.2 and std 3.02
-az.plot_kde(jon_rahm['Round_Score'].values, rug=True)
-plt.yticks([0], alpha=0);
-print('mean score rahmn:',np.mean(jon_rahm['Round_Score'].values))
-print('std score rahm:',np.std(jon_rahm['Round_Score'].values))
+
+plt.hist(jon_rahm['Round_Score'].values, 10, density=True, facecolor='b', alpha=0.75)
+plt.plot(x_axis, norm.pdf(x_axis, rahm_mean, rahm_std))
+plt.xlabel('Score to Par')
+plt.ylabel('Probability')
+plt.title('Jon Rahm round scores to par')
+plt.text(0, 0.15, r'$\mu=-2.2,\ \sigma=3.02$')
+plt.xlim(-15, 15)
+plt.ylim(0, 0.2)
+plt.grid(True)
+plt.show()
+
+
+#Select Shane Lowry
+shane_lowry = data[data['player']=='Shane Lowry']
+lowry_mean = np.mean(shane_lowry['Round_Score'].values)
+lowry_std = np.std(shane_lowry['Round_Score'].values)
+print('mean score:',lowry_mean)
+print('std score:',lowry_std)
+
+
+plt.hist(shane_lowry['Round_Score'].values, 10, density=True, facecolor='b', alpha=0.75)
+plt.plot(x_axis, norm.pdf(x_axis, lowry_mean, lowry_std))
+plt.xlabel('Score to Par')
+plt.ylabel('Probability')
+plt.title('Shane Lowry round scores to par')
+plt.text(0, 0.15, r'$\mu=-0.5,\ \sigma=2.94$')
+plt.xlim(-15, 15)
+plt.ylim(0, 0.2)
+plt.grid(True)
+plt.show()
+
+
+
+
+
+
+
 
 # Get count of rounds
 g_count = pd.DataFrame(data.groupby("player")['hole_par'].count())
