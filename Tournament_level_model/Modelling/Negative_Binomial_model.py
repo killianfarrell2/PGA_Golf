@@ -57,39 +57,38 @@ observed_golfers = training_data.i_golfer.values
 observed_golfers_shared = shared(observed_golfers)
 # Get values for golfers from test set
 observed_golfers_test = test_data.i_golfer.values
-
+#Round score to par
 observed_round_score = training_data.Round_Score.values
-test_set_round_score = test_data.Round_Score.values 
+test_set_round_score = test_data.Round_Score.values
+
+#Total Round Score
+observed_total_score = training_data.Round_total.values
+observed_total_score_test = test_data.Round_total.values
+
+#get observed courses
 observed_courses = training_data.i_course.values
+
+# Observed Par
+observed_par = training_data.par.values
 
 #Get unique number of golfers - shape will be ok below
 num_golfers = len(training_data.i_golfer.drop_duplicates())
 num_courses = len(training_data.i_course.drop_duplicates())
 
-#Normal Distribution - gives output of decimal numbers - we need whole numbers
-#Poisson Distribution - is discreet but may not be accurate
-# Think that Normal Distribution needs to be taken - and then round values from trace
-# 51 divergences with intercept - removed and got slight warning
-# Poisson and Normal similar at large numbers - mean equals variance for poisson
-# This means for Poisson - low scores are a lot more likely
-# Negative Binomial may be more appropriate
-# Prior is belief before evidence is taken into account
-# Intercept is expected mean value of y (golfer to par) when all x = 0
-# When intercept gets added in it is less stable for mean golfer
 
 with pm.Model() as model:
     
-    #Global model parameters - all golfers have same sd
-    #sd_global = pm.HalfStudentT("sd_global", nu=3, sigma=2.5)
-    #mean_global = pm.Normal('mean_global', mu=0, sigma=3)
-    #intercept = pm.Normal('intercept', mu=0, sigma=3)
-
+    # GLobal parameters
+    sd_golfer = pm.HalfStudentT("sd_golfer", nu=3, sigma=2.5)
+    
     # golfer specific parameters
-    mean_golfer = pm.Normal('mean_golfer', mu=0, sigma=3, shape=num_golfers)
-    sd_golfer = pm.HalfStudentT("sd_golfer", nu=3, sigma=2.5, shape=num_golfers)
+    mean_golfer = pm.Normal('mean_golfer', mu=0, sigma=sd_golfer, shape=num_golfers)
+    
+    # Get theta to be used for Poisson Distribution
+    golfer_theta = observed_par + mean_golfer[observed_golfers_shared]
          
-    # Observed scores to par follow normal distribution
-    golfer_to_par = pm.Normal("golfer_to_par", mu=mean_golfer[observed_golfers_shared], sigma=sd_golfer[observed_golfers_shared], observed=observed_round_score)
+    # Observed scores to follow Negative Binomial distribution
+    golfer_round_score = pm.Poisson("golfer_round_score", mu=golfer_theta, observed=observed_total_score)
     
    
 #Set cores to 1
@@ -110,10 +109,10 @@ df_trace = pm.trace_to_dataframe(trace)
 # Bayesian fraction of missing information
 # Gelman rubin - evaluates difference between multiple markov chains
 # Want to see value of less than 1.1 - want to have 1 ideally
-# currently 1.013
+# currently 1.02 - but graph doesn't look great
+#BFMI very low
 bfmi = np.max(pm.stats.bfmi(trace))
 max_gr = max(np.max(gr_stats) for gr_stats in pm.stats.rhat(trace).values()).values
-
 
 (
     pm.energyplot(trace, legend=False, figsize=(6, 4)).set_title(

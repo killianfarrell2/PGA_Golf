@@ -13,6 +13,24 @@ from theano import shared
 data_location = 'D:\\KF_Repo\\PGA_Golf\\Tournament_level_model\\Data_manipulation\\model_data.csv'
 data = pd.read_csv(data_location)
 
+#Gaussian Inference - Round scores to par are normally distributed
+az.plot_kde(data['Round_Score'].values, rug=True)
+plt.yticks([0], alpha=0);
+
+#Get mean and standard deviations of all round scores to par
+round_score_mean = np.mean(data['Round_Score'].values)
+round_score_std = np.std(data['Round_Score'].values)
+print('mean score:',round_score_mean)
+print('std score:',round_score_std)
+#Select Jon Rahm
+jon_rahm = data[data['player']=='Jon Rahm']
+
+# Plot Jon Rahm - sd -2.2 and std 3.02
+az.plot_kde(jon_rahm['Round_Score'].values, rug=True)
+plt.yticks([0], alpha=0);
+print('mean score rahmn:',np.mean(jon_rahm['Round_Score'].values))
+print('std score rahm:',np.std(jon_rahm['Round_Score'].values))
+
 # Get count of rounds
 g_count = pd.DataFrame(data.groupby("player")['hole_par'].count())
 g_count = g_count.rename(columns={"hole_par": "Count_rounds"})
@@ -22,6 +40,7 @@ data = pd.merge(data, g_count, left_on="player", right_index=True, how="left")
 
 #Filter out golfers with less than 28 rounds played
 data = data[data["Count_rounds"]>=28]
+
 
 #Drop column player id - Can't use player ID - get index 9621 is out of bounds error
 data = data.drop(columns=['player id'])
@@ -55,11 +74,10 @@ test_data = data[data['date'] >='2020-10-01']
 #Set values to be used as x
 observed_golfers = training_data.i_golfer.values
 observed_golfers_shared = shared(observed_golfers)
-# Get values for golfers from test set
-observed_golfers_test = test_data.i_golfer.values
 
 observed_round_score = training_data.Round_Score.values
-test_set_round_score = test_data.Round_Score.values 
+
+
 observed_courses = training_data.i_course.values
 
 #Get unique number of golfers - shape will be ok below
@@ -92,6 +110,7 @@ with pm.Model() as model:
     golfer_to_par = pm.Normal("golfer_to_par", mu=mean_golfer[observed_golfers_shared], sigma=sd_golfer[observed_golfers_shared], observed=observed_round_score)
     
    
+
 #Set cores to 1
 # Tuning samples will be discarded
 with model:
@@ -128,33 +147,18 @@ max_gr = max(np.max(gr_stats) for gr_stats in pm.stats.rhat(trace).values()).val
 pm.plot_posterior(trace['mean_golfer'][0])
 
 
-with model:
-    pp_train = pm.sample_posterior_predictive(trace,samples=100)
+# Update data reference.
+pm.set_data({"data": x_test}, model=model)
 
-
-# Check to see if model can reproduce patterns observed in real data
-# because distribution is discrete doesn't fit data well in graph
-az.plot_ppc(az.from_pymc3(posterior_predictive=pp_train, model=model));
-
-
-
-# Set values for Model as test set
-# Have 6687 values
-observed_golfers_shared.set_value(observed_golfers_test)
 
 #Output is decimal number score to par - need to add to par and then round
 with model:
-    pp_test_set = pm.sample_posterior_predictive(trace,samples=100)
+    pp_trace = pm.sample_posterior_predictive(trace,samples=100)
+    
 
-#Create Dataframe from pp_test_set   
-normal_scores = pp_test_set['golfer_to_par']
 
-# Round scores to the nearest whole number
-round_scores = normal_scores.round(0)
-#Each column is a row in data
+    
 
-# Could be lower as used shared
-az.plot_ppc(az.from_pymc3(posterior_predictive=pp_test_set, model=model));
 
 
 
