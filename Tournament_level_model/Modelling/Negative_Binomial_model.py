@@ -57,9 +57,9 @@ observed_golfers = training_data.i_golfer.values
 observed_golfers_shared = shared(observed_golfers)
 # Get values for golfers from test set
 observed_golfers_test = test_data.i_golfer.values
-#Round score to par
-observed_round_score = training_data.Round_Score.values
-test_set_round_score = test_data.Round_Score.values
+#Round score to par shifted by 18
+observed_round_score = training_data.Round_Score.values + 18
+test_set_round_score = test_data.Round_Score.values + 18
 
 #Total Round Score
 observed_total_score = training_data.Round_total.values
@@ -78,17 +78,25 @@ num_courses = len(training_data.i_course.drop_duplicates())
 
 with pm.Model() as model:
     
+    # Hyper priors
+    mu_a = pm.Normal('mu_alpha', mu=0., sigma=1)
+    sigma_a = pm.HalfCauchy('sigma_alpha', beta=1)
+    mu_b = pm.Normal('mu_beta', mu=0., sigma=1)
+    sigma_b = pm.HalfCauchy('sigma_beta', beta=1)
+    
     # GLobal parameters
-    sd_golfer = pm.HalfStudentT("sd_golfer", nu=3, sigma=2.5)
+    #sd_global = pm.HalfNormal("sd_global", sigma=3)
     
-    # golfer specific parameters
-    mean_golfer = pm.Normal('mean_golfer', mu=0, sigma=sd_golfer, shape=num_golfers)
-    
-    # Get theta to be used for Poisson Distribution
-    golfer_theta = observed_par + mean_golfer[observed_golfers_shared]
+    # a and b parameters identical so maybe no point in having them in
+    a = pm.Normal('alpha', mu=mu_a, sigma=sigma_a, shape=num_golfers)
+    b = pm.Normal('beta', mu=mu_b, sigma=sigma_b, shape=num_golfers)
+       
+    # Get theta to be used for Poisson Distribution    
+    golfer_theta = tt.exp(a[observed_golfers_shared] + b[observed_courses])
          
     # Observed scores to follow Negative Binomial distribution
-    golfer_round_score = pm.Poisson("golfer_round_score", mu=golfer_theta, observed=observed_total_score)
+    #Can 18 be subtracted here
+    golfer_round_score = pm.Poisson("golfer_round_score", mu=golfer_theta, observed=observed_round_score)
     
    
 #Set cores to 1
@@ -124,11 +132,11 @@ max_gr = max(np.max(gr_stats) for gr_stats in pm.stats.rhat(trace).values()).val
 #Plot Posterior of specific player - Poisson gives much wider distribution than normal
 # Ranges don't look wide enough - shrunk toward average maybe?
 # Posterior looks different to summary info - mean is different (-0.53 vs -0.836)
-pm.plot_posterior(trace['mean_golfer'][0])
+pm.plot_posterior(trace['golfer'][0])
 
 
 with model:
-    pp_train = pm.sample_posterior_predictive(trace,samples=100)
+    pp_train = pm.sample_posterior_predictive(trace,samples=5000)
 
 
 # Check to see if model can reproduce patterns observed in real data
