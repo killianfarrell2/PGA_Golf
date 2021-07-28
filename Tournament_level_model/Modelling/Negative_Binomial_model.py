@@ -136,7 +136,7 @@ pm.plot_posterior(trace['golfer'][0])
 
 
 with model:
-    pp_train = pm.sample_posterior_predictive(trace,samples=5000)
+    pp_train = pm.sample_posterior_predictive(trace,samples=1000)
 
 
 # Check to see if model can reproduce patterns observed in real data
