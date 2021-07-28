@@ -127,14 +127,19 @@ max_gr = max(np.max(gr_stats) for gr_stats in pm.stats.rhat(trace).values()).val
 # Posterior looks different to summary info - mean is different (-0.53 vs -0.836)
 pm.plot_posterior(trace['mean_golfer'][0])
 
-
+# Sample Posterior predictive
 with model:
     pp_train = pm.sample_posterior_predictive(trace,samples=100)
+    
+pp_train["golfer_to_par"].shape
+
+
+# Round scores to the nearest whole number
+pp_train_rounded = {'golfer_to_par': pp_train['golfer_to_par'].round(0)}
 
 
 # Check to see if model can reproduce patterns observed in real data
-# because distribution is discrete doesn't fit data well in graph
-az.plot_ppc(az.from_pymc3(posterior_predictive=pp_train, model=model));
+az.plot_ppc(az.from_pymc3(posterior_predictive=pp_train_rounded, model=model));
 
 
 
@@ -145,17 +150,61 @@ observed_golfers_shared.set_value(observed_golfers_test)
 #Output is decimal number score to par - need to add to par and then round
 with model:
     pp_test_set = pm.sample_posterior_predictive(trace,samples=100)
-
-#Create Dataframe from pp_test_set   
-normal_scores = pp_test_set['golfer_to_par']
+    
 
 # Round scores to the nearest whole number
-round_scores = normal_scores.round(0)
-#Each column is a row in data
+pp_test_rounded = {'golfer_to_par': pp_test_set['golfer_to_par'].round(0)}
+
+
 
 # Could be lower as used shared
-az.plot_ppc(az.from_pymc3(posterior_predictive=pp_test_set, model=model));
+az.plot_ppc(az.from_pymc3(posterior_predictive=pp_test_rounded, model=model));
+
+import matplotlib as plt
+
+golfer_0 = pp_test_rounded['golfer_to_par'][:, 0]
+
+plt.hist(golfer_0, bins=50, color='tab:blue')
+
+# hpd
+_, ax = plt.subplots(figsize=(12, 6))
+ax.plot(
+    [observed_golfers_test, observed_golfers_test],
+    az.hpd(pp_test_rounded['golfer_to_par']).T,
+    lw=6,
+    color="#00204C",
+    alpha=0.8,
+)
+# actual outcomes:
+ax.scatter(
+    x=observed_golfers_test,
+    y=test_set_round_score,
+    marker="x",
+    color="#A69C75",
+    alpha=0.8,
+    label="Observed outcomes",
+)
 
 
 
+# Simulate Tournaments
+
+list_of_tournaments = test_data['tournament name'].unique()
+
+masters_scores = test_data[test_data['tournament name']=='Masters Tournament']['Round_Score']
+masters_golfers = test_data[test_data['tournament name']=='Masters Tournament']['i_golfer']
+
+# Draw from Posterior - Can't use Test Set Posterior as outcome could change
+
+# Only Predictor is golfer
+# Every player should have at least 2 rounds
+
+
+
+observed_tournament
+test_data['tournament name']
+
+# Increase number of draws and then take an average and mean for each - 100 samples not that much
+transpose = pp_test_set['golfer_to_par'].T
+transpose_r = pp_test_rounded['golfer_to_par'].T
 
