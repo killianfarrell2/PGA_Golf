@@ -27,6 +27,8 @@ min_score = data['Round_Score'].min()
 print(min_score)
 max_score =data['Round_Score'].max()
 print(max_score)
+skew =data['Round_Score'].skew()
+print(skew)
 
 import matplotlib.pyplot as plt
 from scipy.stats import norm
@@ -48,7 +50,7 @@ plt.plot(x_axis, norm.pdf(x_axis, mu_graph, std_graph))
 plt.xlabel('Score to Par')
 plt.ylabel('Probability')
 plt.title('Histogram of golfer round scores to par')
-plt.text(0, 0.15, r'$\mu=-0.68,\ \sigma=3.2$')
+plt.text(0, 0.15, r'$\mu=-0.68,\ \sigma=3.2,skew=0.35$')
 plt.xlim(-15, 15)
 plt.ylim(0, 0.20)
 plt.grid(True)
