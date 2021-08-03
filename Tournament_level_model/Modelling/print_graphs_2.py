@@ -13,28 +13,28 @@ from theano import shared
 data_location = 'D:\\KF_Repo\\PGA_Golf\\Tournament_level_model\\Data_manipulation\\model_data.csv'
 data = pd.read_csv(data_location)
 
-#Gaussian Inference - Round scores to par are normally distributed
-az.plot_kde(data['Round_Score'].values, rug=True)
+
+az.plot_kde(data['Round_total'].values, rug=True)
 plt.yticks([0], alpha=0);
 
 import matplotlib.pyplot as plt
 
-mu_graph = data['Round_Score'].mean()
+mu_graph = data['Round_total'].mean()
 print(mu_graph)
-mode_graph = data['Round_Score'].mode()
+mode_graph = data['Round_total'].mode()
 print(mode_graph)
-median_graph = data['Round_Score'].median()
+median_graph = data['Round_total'].median()
 print(median_graph)
 
-std_graph = data['Round_Score'].std()
+std_graph = data['Round_total'].std()
 print(std_graph)
-min_score = data['Round_Score'].min()
+min_score = data['Round_total'].min()
 print(min_score)
-max_score =data['Round_Score'].max()
+max_score =data['Round_total'].max()
 print(max_score)
-skew =data['Round_Score'].skew()
+skew =data['Round_total'].skew()
 print(skew)
-kurtosis =data['Round_Score'].kurtosis()
+kurtosis =data['Round_total'].kurtosis()
 print(kurtosis)
 
 # Tail risk - positive skew (0.35) - mean is greater than mode - right tail longer
