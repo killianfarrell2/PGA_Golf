@@ -36,10 +36,62 @@ skew =data['Round_Score'].skew()
 print(skew)
 kurtosis =data['Round_Score'].kurtosis()
 print(kurtosis)
+length = len(data['Round_Score'])
+print(length)
+
+# Generate random scores with Normal Distribution
+random_scores = np.random.normal(loc=mu_graph, scale=std_graph, size=length)
+# Round random scores to nearest integer
+random_scores_rd = pd.DataFrame(random_scores.round(0))
+
+# K-S test
+
+import matplotlib.pyplot as plt
+import scipy.stats as sc
+from scipy.stats import norm
+import statistics
+
+
+# K-S test comparing both samples
+ks1 = sc.ks_2samp(random_scores_rd, data['Round_Score'], alternative='two-sided', mode='auto')
+
+# Max distance from distributions - want closer to 0
+ks1_dstat = ks1[0]
+# P value - reject null that drawn from same distribution if less than 5%
+# My p value is less than 5% so reject null that they are the same
+ks1_pvalue = ks1[1]
+
+# Observed values
+freq_1 = pd.DataFrame(data['Round_Score'].value_counts())
+freq_1 = freq_1.reset_index()
+
+# Expected values
+freq_exp = pd.DataFrame(random_scores_rd.value_counts())
+freq_exp = freq_exp.rename(columns={0: "expected"})
+freq_exp = freq_exp.reset_index()
+freq_exp = freq_exp.rename(columns={0: "index"})
+
+# Join actual and expected
+join = pd.merge(freq_1, freq_exp, left_on='index', right_on='index', how="left")
+
+# Update nan to 0
+join['expected'] = join['expected'].fillna(0)
+
+#Get number of categories
+dof = len(join['expected'])
+
+# Chi squared test
+# test the null that categorical data has given frequencies
+chi_1 = sc.chisquare(join['Round_Score'],ddof =0,  f_exp=join['expected'],axis=0)
+
+#P value - less than 5% - can conclude data not drawn from same distribution
+# High p values indicate goodness of fit
+chi_1_pv = chi_1[1]
+
 
 # Tail risk - positive skew (0.35) - mean is greater than mode - right tail longer
 # More scores left of distribution, but more extremes on the right
-# more likely to get a player to shoot +16 than 
+# more likely to get a player to shoot +16 than  -16
 
 #Kurtosis is 0.38 - used to describe extreme values in 1 tail vs the other
 # measures outliers
@@ -47,10 +99,6 @@ print(kurtosis)
 # Low Kurtosis means few outliers
 # Kurtosis < 3 - distribution is shorter tails are thinner
 
-
-import matplotlib.pyplot as plt
-from scipy.stats import norm
-import statistics
     
 # Plot between -30 and 30 with
 # 0.1 steps.
@@ -88,7 +136,7 @@ my_data = data['Round_Score']
 sm.qqplot(my_data, line='45')
 pylab.show()
 
-# K-S test
+# K-S test with Normal Distribution
 from scipy.stats import kstest, norm
 my_data = data['Round_Score']
 ks_statistic, p_value = kstest(my_data, 'norm')
@@ -96,11 +144,6 @@ print(ks_statistic, p_value)
 
 # If Value of K-s = 0 then we assume it is Normal
 # Our K-S is 0.39 and p value is 0.0 - needs to be greater than 0.05
-
-
-
-
-
 
 #Get mean and standard deviations of all round scores to par
 round_score_mean = np.mean(data['Round_Score'].values)
