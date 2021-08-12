@@ -81,6 +81,9 @@ with pm.Model() as model:
          
     # Observed scores to par follow normal distribution
     golfer_to_par = pm.Normal("golfer_to_par", mu=mean_golfer[observed_golfers_shared], sigma=eps, observed=observed_round_score)
+    
+    # Prior Predictive checks - generate samples without taking data
+    prior_checks = pm.sample_prior_predictive(samples=100, random_seed=1234)
 
     
 #Set cores to 1
@@ -111,17 +114,6 @@ max_gr = max(np.max(gr_stats) for gr_stats in pm.stats.rhat(trace).values()).val
 pm.energyplot(trace, legend=False, figsize=(6, 4)).set_title(f"BFMI = {bfmi}\nGelman-Rubin = {max_gr}")
 
 
-
-#Plot Posterior of specific player - Poisson gives much wider distribution than normal
-# Ranges don't look wide enough - shrunk toward average maybe?
-# Posterior looks different to summary info - mean is different (-0.53 vs -0.836)
-# Plot Posterior for Shane Lowry
-pm.plot_posterior(trace['mean_golfer'][100])
-
-# Plot Posterior for Jon Rahm
-pm.plot_posterior(trace['mean_golfer'][159])
-
-
 # Sample Posterior predictive
 with model:
     pp_train = pm.sample_posterior_predictive(trace,samples=1000)
@@ -135,12 +127,31 @@ pp_train_rounded = {'golfer_to_par': pp_train['golfer_to_par'].round(0)}
 
 transposed_rounded = pp_train_rounded['golfer_to_par'].T
 
+scores_rounded = pd.DataFrame(transposed_rounded)
+
 # Reset index on training dataset
 training_data_reset = training_data.reset_index(drop=True)
 
 # HDI chart that works - reset training index
 # Function takes hdi of each column
 az.plot_hdi(training_data_reset.index,  pp_train_rounded['golfer_to_par'])
+
+actual_scores = training_data_reset.Round_Score.reset_index(drop=True)
+
+
+# Plot Chart for all golfers
+_, ax = plt.subplots()
+az.plot_hdi(scores_rounded.index, scores_rounded.T, hdi_prob=0.94, fill_kwargs={"alpha": 0.8, "label": "Posterior Pred 94% HDI"})
+# Get mean of each column of predicted outcomes
+ax.plot(scores_rounded.index, scores_rounded.mean(axis=1), label="Mean Posterior Pred", alpha=0.8)
+ax.plot(scores_rounded.index, actual_scores, "x", ms=4, alpha=0.6,color="black", label="Actual Data")
+ax.set_xlabel("Observation") 
+ax.set_ylabel("Round Score to Par")
+ax.set_title("Observations vs Posterior Predictive")
+ax.legend(fontsize=10, frameon=True, framealpha=0.5,loc='upper right',bbox_to_anchor=(1, 1))
+
+
+
 
 # Get Shane Lowry Values
 shane_lowry = training_data_reset[training_data_reset['player']=='Shane Lowry']
