@@ -71,28 +71,28 @@ with pm.Model() as model:
     #Hyper Priors
     mean_golfer_sd  = pm.HalfCauchy('mean_golfer_sd', beta=1)
     mean_golfer_mu = pm.Normal('mean_golfer_mu', mu=0, sigma=1)
+    sd_golfer_beta = pm.HalfCauchy('sd_golfer_beta', beta=0.0005)
     # golfer specific parameters
     mean_golfer = pm.Normal('mean_golfer', mu=mean_golfer_mu, sigma=mean_golfer_sd, shape=num_golfers)
-    #Model Error - deviation of observed value from true value
-    eps = pm.HalfCauchy('eps', beta=1)     
+    #standard deviation for each golfer
+    sd_golfer = pm.HalfCauchy('sd_golfer', beta=sd_golfer_beta, shape=num_golfers)     
     # Observed scores to par follow normal distribution
-    golfer_to_par = pm.Normal("golfer_to_par", mu=mean_golfer[observed_golfers_shared], sigma=eps, observed=observed_round_score)
+    golfer_to_par = pm.Normal("golfer_to_par", mu=mean_golfer[observed_golfers_shared], sigma=sd_golfer[observed_golfers_shared], observed=observed_round_score)
     # Prior Predictive checks - generate samples without taking data
     prior_checks = pm.sample_prior_predictive(samples=1000, random_seed=1234)
 
 
 # Round scores to the nearest whole number
 prior_check_rounded = {'golfer_to_par': prior_checks['golfer_to_par'].round(0)}
-
+#Put scores into dataframe
 prior_scores_rounded = pd.DataFrame(prior_check_rounded['golfer_to_par'].T)
-
 # Get actual scores
 actual_scores = training_data.Round_Score.reset_index(drop=True)
 
 
 # Plot Chart for all golfers for Prior Predictive
 _, ax = plt.subplots()
-az.plot_hdi(prior_scores_rounded.index, prior_scores_rounded.T, hdi_prob=0.94, fill_kwargs={"alpha": 0.8, "label": "Posterior Pred 94% HDI"})
+az.plot_hdi(prior_scores_rounded.index, prior_scores_rounded.T, hdi_prob=0.94, fill_kwargs={"alpha": 0.8, "label": "Prior Pred 94% HDI"})
 # Get mean of each column of predicted outcomes
 ax.plot(prior_scores_rounded.index, prior_scores_rounded.mean(axis=1), label="Mean Prior Pred", alpha=0.8)
 ax.plot(prior_scores_rounded.index, actual_scores, "x", ms=4, alpha=0.6,color="black", label="Actual Data")
@@ -144,7 +144,6 @@ az.plot_ppc(az.from_pymc3(posterior_predictive=pp_train, model=model));
 pp_train_rounded = {'golfer_to_par': pp_train['golfer_to_par'].round(0)}
 
 transposed_rounded = pp_train_rounded['golfer_to_par'].T
-
 scores_rounded = pd.DataFrame(transposed_rounded)
 
 # Reset index on training dataset
