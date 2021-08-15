@@ -51,7 +51,6 @@ date_count = pd.DataFrame(data.groupby("date")['hole_par'].count())
 training_data = data[data['date'] <'2020-10-01']
 test_data = data[data['date'] >='2020-10-01']
 
-
 #Set values to be used as x
 observed_golfers = training_data.i_golfer.values
 observed_golfers_shared = shared(observed_golfers)
@@ -66,18 +65,20 @@ observed_courses = training_data.i_course.values
 num_golfers = len(training_data.i_golfer.drop_duplicates())
 num_courses = len(training_data.i_course.drop_duplicates())
 
-#Cauchy Distribution - gives output of decimal numbers - we need whole numbers
+#Cauchy Distribution 
+
+# beta=beta_golfer[observed_golfers_shared]
+
 with pm.Model() as model:
-    
     #Hyper Priors
-    mean_golfer_sd  = pm.HalfCauchy('mean_golfer_sd', beta=1)
-    mean_golfer_mu = pm.Normal('mean_golfer_mu', mu=0, sigma=1)
+    #mean_golfer_sd  = pm.Uniform('mean_golfer_sd',lower=0, upper=5)
+    #mean_golfer_mu = pm.Normal('mean_golfer_mu', mu=0, sigma=1)
     # golfer specific parameters
-    mean_golfer = pm.Normal('mean_golfer', mu=mean_golfer_mu, sigma=mean_golfer_sd, shape=num_golfers)
+    #mean_golfer = pm.Normal('mean_golfer', mu=mean_golfer_mu, sigma=mean_golfer_sd, shape=num_golfers)
     #Beta - determines how big tails are
-    beta = pm.HalfCauchy('eps', beta=1)
-    # Observed scores to par follow normal distribution
-    golfer_to_par = pm.Cauchy("golfer_to_par", alpha=mean_golfer[observed_golfers_shared], beta=beta, observed=observed_round_score)
+    #beta_golfer = pm.Uniform('beta_golfer', lower=0,upper=1,shape=num_golfers)
+    # Observed scores to par follow Cauchy distribution
+    golfer_to_par = pm.Cauchy("golfer_to_par", alpha=-1, beta=0.0001, observed=observed_round_score)
     # Prior Predictive checks - generate samples without taking data
     prior_checks = pm.sample_prior_predictive(samples=1000, random_seed=1234)
 
@@ -86,16 +87,23 @@ with pm.Model() as model:
 prior_check_rounded = {'golfer_to_par': prior_checks['golfer_to_par'].round(0)}
 #Put scores into dataframe
 prior_scores_rounded = pd.DataFrame(prior_check_rounded['golfer_to_par'].T)
+# Transpose scores
+t_prior_scores_rounded = prior_scores_rounded.T
 # Get actual scores
 actual_scores = training_data.Round_Score.reset_index(drop=True)
 
+# Get index for prior scores rounded
+prior_indices = prior_scores_rounded.index
+
+# Get mean of prior scores rounded
+prior_mean = prior_scores_rounded.mean(axis=1)
 
 # Plot Chart for all golfers for Prior Predictive
 _, ax = plt.subplots()
-az.plot_hdi(prior_scores_rounded.index, prior_scores_rounded.T, hdi_prob=0.94, fill_kwargs={"alpha": 0.8, "label": "Prior Pred 94% HDI"})
+az.plot_hdi(prior_indices , t_prior_scores_rounded, hdi_prob=0.94, fill_kwargs={"alpha": 0.8, "label": "Prior Pred 94% HDI"})
 # Get mean of each column of predicted outcomes
-ax.plot(prior_scores_rounded.index, prior_scores_rounded.mean(axis=1), label="Mean Prior Pred", alpha=0.8)
-ax.plot(prior_scores_rounded.index, actual_scores, "x", ms=4, alpha=0.6,color="black", label="Actual Data")
+ax.plot(prior_indices , prior_mean, label="Mean Prior Pred", alpha=0.8)
+ax.plot(prior_indices , actual_scores, "x", ms=4, alpha=0.6,color="black", label="Actual Data")
 ax.set_xlabel("Observation") 
 ax.set_ylabel("Round Score to Par")
 ax.set_title("Observations vs Prior Predictive")

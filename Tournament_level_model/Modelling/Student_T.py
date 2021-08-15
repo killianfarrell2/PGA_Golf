@@ -66,24 +66,23 @@ observed_courses = training_data.i_course.values
 num_golfers = len(training_data.i_golfer.drop_duplicates())
 num_courses = len(training_data.i_course.drop_duplicates())
 
-#Normal Distribution
+#Skewed Normal Distribution
 with pm.Model() as model:
     #Hyper Priors - need to use conjugate priors
     # Inverse gamma is conjugate for Normal variance
     # Normal is conjugate prior for normal mean
     mean_golfer_sd  = pm.Uniform('mean_golfer_sd',lower=0, upper=10)
     mean_golfer_mu = pm.Normal('mean_golfer_mu', mu=0, sigma=1)
-    # Conjugate prior for inverse gamma is gamma??
-    # Try uniform - weak priors
-    #sd_golfer_beta = pm.Uniform('sd_golfer_beta', lower=0,upper=10)
-    #sd_golfer_alpha = pm.Uniform('sd_golfer_alpha', lower=0,upper=10)
     
     # golfer specific parameters
-    mean_golfer = pm.Normal('mean_golfer', mu=mean_golfer_mu, sigma=mean_golfer_sd, shape=num_golfers)
+    mean_golfer = pm.Normal('mean_golfer', mu=mean_golfer_mu, sigma=mean_golfer_sd,shape=num_golfers)
     #standard deviation for each golfer - Inverse gamma is prior for standard deviation
-    sd_golfer = pm.Uniform('sd_golfer',lower=0, upper=10, shape=num_golfers)     
-    # Observed scores to par follow normal distribution
-    golfer_to_par = pm.Normal("golfer_to_par", mu=mean_golfer[observed_golfers_shared], sigma=sd_golfer[observed_golfers_shared], observed=observed_round_score)
+    sd_golfer = pm.Uniform('sd_golfer',lower=0, upper=10,shape=num_golfers)     
+    #Skew parameter - positive skew only (Right skew) - long right tail
+    #nu_golfer = pm.Uniform('nu_golfer',lower=0, upper=10,shape=num_golfers)
+    
+    # Observed scores to par follow Skew normal distribution
+    golfer_to_par = pm.StudentT("golfer_to_par", nu=1, mu=mean_golfer[observed_golfers_shared], sigma=sd_golfer[observed_golfers_shared], observed=observed_round_score)
     # Prior Predictive checks - generate samples without taking data
     prior_checks = pm.sample_prior_predictive(samples=1000, random_seed=1234)
 
@@ -116,9 +115,14 @@ ax.legend(fontsize=10, frameon=True, framealpha=0.5,loc='upper right',bbox_to_an
 
 
 
+# Plot Chart with Score to Par for all golfers as histogram with probabilities of each score
+# Probability on y-axis with score to par on x-axis
+
+
     
 #Set cores to 1
 # Tuning samples will be discarded
+# Took approx 80 mins to finish 2 chains
 with model:
     trace = pm.sample(1000,chains=2, tune=1000, cores=1,random_seed=1234)
 
@@ -140,10 +144,8 @@ df_trace = pm.trace_to_dataframe(trace)
 bfmi = np.max(pm.stats.bfmi(trace))
 max_gr = max(np.max(gr_stats) for gr_stats in pm.stats.rhat(trace).values()).values
 
-
 # Energy plot
 pm.energyplot(trace, legend=False, figsize=(6, 4)).set_title(f"BFMI = {bfmi}\nGelman-Rubin = {max_gr}")
-
 
 # Sample Posterior predictive
 with model:
@@ -169,9 +171,16 @@ az.plot_hdi(training_data_reset.index,  pp_train_rounded['golfer_to_par'])
 actual_scores = training_data_reset.Round_Score.reset_index(drop=True)
 
 
+az.hpd(pp_train_rounded)
+
+scores_hdi = az.hdi(pp_train_rounded['golfer_to_par'],hdi_prob=0.94)
+scores_hdi_99 = az.hdi(pp_train_rounded['golfer_to_par'],hdi_prob=0.9999999)
+
+
+
 # Plot Chart for all golfers
 _, ax = plt.subplots()
-az.plot_hdi(scores_rounded.index, scores_rounded.T, hdi_prob=0.94, fill_kwargs={"alpha": 0.8, "label": "Posterior Pred 94% HDI"})
+az.plot_hdi(scores_rounded.index, scores_rounded.T, hdi_prob=0.9999999, fill_kwargs={"alpha": 0.8, "label": "Posterior Pred 94% HDI"})
 # Get mean of each column of predicted outcomes
 ax.plot(scores_rounded.index, scores_rounded.mean(axis=1), label="Mean Posterior Pred", alpha=0.8)
 ax.plot(scores_rounded.index, actual_scores, "x", ms=4, alpha=0.6,color="black", label="Actual Data")
