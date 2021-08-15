@@ -66,24 +66,23 @@ observed_courses = training_data.i_course.values
 num_golfers = len(training_data.i_golfer.drop_duplicates())
 num_courses = len(training_data.i_course.drop_duplicates())
 
-#Student T Distribution
-with pm.Model() as model:
+#Ex Gaussian Distribution
+#nu=8,mu=-6,sd=4
+
+with pm.Model() as model:    
     #Hyper Priors - need to use conjugate priors
     mean_golfer_sd  = pm.Uniform('mean_golfer_sd',lower=0, upper=5)
-    mean_golfer_mu = pm.Normal('mean_golfer_mu', mu=-0.5, sigma=1)
-    
+    mean_golfer_mu = pm.Normal('mean_golfer_mu', mu=-6, sigma=1)
     # golfer specific parameters
     mean_golfer = pm.Normal('mean_golfer', mu=mean_golfer_mu, sigma=mean_golfer_sd,shape=num_golfers)
     #standard deviation for each golfer - Inverse gamma is prior for standard deviation
     sd_golfer = pm.Uniform('sd_golfer',lower=2, upper=5,shape=num_golfers)     
-    #Dof Parameter
-    nu_golfer = pm.Uniform('nu_golfer',lower=2, upper=20,shape=num_golfers)
-    
-    # Observed scores to par follow Skew normal distribution
-    golfer_to_par = pm.StudentT("golfer_to_par", nu=nu_golfer[observed_golfers_shared], mu=mean_golfer[observed_golfers_shared], sigma=sd_golfer[observed_golfers_shared], observed=observed_round_score)
+    #Exponential parameter
+    nu_golfer = pm.Uniform('nu_golfer',lower=5, upper=10,shape=num_golfers)
+    # Mean = nu + mu (this should be larger than mode of -1)
+    golfer_to_par = pm.ExGaussian("golfer_to_par", nu=nu_golfer[observed_golfers_shared], mu=mean_golfer[observed_golfers_shared], sigma=sd_golfer[observed_golfers_shared], observed=observed_round_score)
     # Prior Predictive checks - generate samples without taking data
     prior_checks = pm.sample_prior_predictive(samples=1000, random_seed=1234)
-
 
 # Round scores to the nearest whole number
 prior_check_rounded = {'golfer_to_par': prior_checks['golfer_to_par'].round(0)}
