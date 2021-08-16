@@ -68,19 +68,28 @@ num_courses = len(training_data.i_course.drop_duplicates())
 
 #Ex Gaussian Distribution
 #nu=8,mu=-6,sd=4
+# nu=1/lambda (lambda is rate and nu is mean)
+# nu is time between events and lambda is rate of events
+# 1/nu related to alpha and beta from gamma distribution
+# Gmma(Shape param=a+n, Rate param=Beta+T)
+# Gamma Distribution - wait time until future events
+# Exponential predicts time to first event
+# Gamma is wait time until kth event (alpha)
+# Increasing alpha increase time, increasing beta decreases
 
 with pm.Model() as model:    
     #Hyper Priors - need to use conjugate priors
-    mean_golfer_sd  = pm.Uniform('mean_golfer_sd',lower=0, upper=5)
-    mean_golfer_mu = pm.Normal('mean_golfer_mu', mu=-6, sigma=1)
+    #mean_golfer_sd  = pm.HalfNormal('mean_golfer_sd',sigma=2)
+    #mean_golfer_mu = pm.Normal('mean_golfer_mu', mu=-6, sigma=1)
     # golfer specific parameters
-    mean_golfer = pm.Normal('mean_golfer', mu=mean_golfer_mu, sigma=mean_golfer_sd,shape=num_golfers)
+    mean_golfer = pm.Normal('mean_golfer', mu=-6, sigma=3, shape=num_golfers)
     #standard deviation for each golfer - Inverse gamma is prior for standard deviation
-    sd_golfer = pm.Uniform('sd_golfer',lower=2, upper=5,shape=num_golfers)     
+    sd_golfer = pm.HalfNormal('sd_golfer',sigma=3)     
     #Exponential parameter
-    nu_golfer = pm.Uniform('nu_golfer',lower=5, upper=10,shape=num_golfers)
+    #nu_golfer = pm.Gamma('nu_golfer',alpha=1, beta=1,shape=num_golfers)
+    nu_golfer = pm.Uniform('nu_golfer',lower=0,upper=10,shape=num_golfers)
     # Mean = nu + mu (this should be larger than mode of -1)
-    golfer_to_par = pm.ExGaussian("golfer_to_par", nu=nu_golfer[observed_golfers_shared], mu=mean_golfer[observed_golfers_shared], sigma=sd_golfer[observed_golfers_shared], observed=observed_round_score)
+    golfer_to_par = pm.ExGaussian("golfer_to_par", nu=nu_golfer[observed_golfers_shared], mu=mean_golfer[observed_golfers_shared], sigma=sd_golfer, observed=observed_round_score)
     # Prior Predictive checks - generate samples without taking data
     prior_checks = pm.sample_prior_predictive(samples=1000, random_seed=1234)
 
@@ -190,91 +199,44 @@ ax.set_title("Observations vs Posterior Predictive")
 ax.legend(fontsize=10, frameon=True, framealpha=0.5,loc='upper right',bbox_to_anchor=(1, 1))
 
 
-
-
-# Get Shane Lowry Values
-shane_lowry = training_data_reset[training_data_reset['player']=='Shane Lowry']
-shane_lowry_indexs = shane_lowry.index
-#Get simulated scores
-shane_lowry_rounded = pd.DataFrame(transposed_rounded[shane_lowry_indexs])
-# Get actual scores
-shane_lowry_actual = shane_lowry.Round_Score.reset_index(drop=True)
-
-
-# Get Jon Rahm Values
-jon_rahm = training_data_reset[training_data_reset['player']=='Jon Rahm']
-jon_rahm_indexs = jon_rahm.index
-# Get simulated scores
-jon_rahm_rounded = pd.DataFrame(transposed_rounded[jon_rahm_indexs])
-# Get actual scores
-jon_rahm_actual = jon_rahm.Round_Score.reset_index(drop=True)
-
-
-
-# Plot Chart for Shane Lowry
-_, ax = plt.subplots()
-az.plot_hdi(shane_lowry_rounded.index, shane_lowry_rounded.T,hdi_prob=0.94, fill_kwargs={"alpha": 0.8, "label": "Posterior Pred 94% HDI"})
-# Get mean of each column of predicted outcomes
-ax.plot(shane_lowry_rounded.index, shane_lowry_rounded.mean(axis=1), label="Mean Posterior Pred", alpha=0.8)
-ax.plot(shane_lowry_rounded.index, shane_lowry_actual, "x", ms=4, alpha=0.6,color="black", label="Actual Data")
-ax.set_xlabel("Observation") 
-ax.set_ylabel("Round Score to Par")
-ax.set_title("Shane Lowry Observations vs Posterior Predictive")
-ax.legend(fontsize=10, frameon=True, framealpha=0.5,loc='upper right',bbox_to_anchor=(1, 1))
-
-
-# Plot Chart for Jon Rahm
-_, ax = plt.subplots()
-az.plot_hdi(jon_rahm_rounded.index, jon_rahm_rounded.T,hdi_prob=0.94, fill_kwargs={"alpha": 0.8, "label": "Posterior Pred 94% HDI"})
-# Get mean of each column of predicted outcomes
-ax.plot(jon_rahm_rounded.index, jon_rahm_rounded.mean(axis=1), label="Mean Posterior Pred", alpha=0.8)
-ax.plot(jon_rahm_rounded.index, jon_rahm_actual, "x", ms=4, alpha=0.6,color="black", label="Actual Data")
-ax.set_xlabel("Observation") 
-ax.set_ylabel("Round Score to Par")
-ax.set_title("Jon Rahm Observations vs Posterior Predictive")
-ax.legend(fontsize=10, frameon=True, framealpha=0.5,loc='upper right',bbox_to_anchor=(1, 1))
-
-
-# Check to see if model can reproduce patterns observed in real data
-az.plot_ppc(az.from_pymc3(posterior_predictive=pp_train_rounded, model=model));
-
-
-
-# Set values for Model as test set
-# Have 6687 values
+# Set input for model as golfers from test set
 observed_golfers_shared.set_value(observed_golfers_test)
 
-#Output is decimal number score to par - need to add to par and then round
+#Generate 1000 samples for each observation
 with model:
-    pp_test_set = pm.sample_posterior_predictive(trace,samples=100)
+    pp_test_set = pm.sample_posterior_predictive(trace,samples=1000)
     
-
 # Round scores to the nearest whole number
 pp_test_rounded = {'golfer_to_par': pp_test_set['golfer_to_par'].round(0)}
 
-# Could be lower as used shared
-az.plot_ppc(az.from_pymc3(posterior_predictive=pp_test_rounded, model=model));
 
-import matplotlib as plt
+#Put scores into dataframe
+test_scores_df = pd.DataFrame(pp_test_rounded['golfer_to_par'].T)
+# Transpose scores
+t_test_scores_df = test_scores_df.T
+# Get actual scores
+actual_test = test_data.Round_Score.reset_index(drop=True)
 
-golfer_0 = pp_test_rounded['golfer_to_par'][:, 0]
+# Get index for prior scores rounded
+test_indices = test_scores_df.index
 
-plt.hist(golfer_0, bins=50, color='tab:blue')
+# Get mean of prior scores rounded
+test_mean = test_scores_df.mean(axis=1)
+
+# Plot Chart for all golfers for Test set
+_, ax = plt.subplots()
+az.plot_hdi(test_indices , t_test_scores_df, hdi_prob=0.94, fill_kwargs={"alpha": 0.8, "label": "Test set Pred 94% HDI"})
+# Get mean of each column of predicted outcomes
+ax.plot(test_indices , test_mean, label="Mean Test Pred", alpha=0.8)
+ax.plot(test_indices , actual_test, "x", ms=4, alpha=0.6,color="black", label="Actual Data")
+ax.set_xlabel("Observation") 
+ax.set_ylabel("Round Score to Par")
+ax.set_title("Observations vs Test set Prediction")
+ax.legend(fontsize=10, frameon=True, framealpha=0.5,loc='upper right',bbox_to_anchor=(1, 1))
 
 
-# Next step Simulate Tournaments
 
-list_of_tournaments = test_data['tournament name'].unique()
 
-masters_scores = test_data[test_data['tournament name']=='Masters Tournament']['Round_Score']
-masters_golfers = test_data[test_data['tournament name']=='Masters Tournament']['i_golfer']
 
-# Draw from Posterior - Can't use Test Set Posterior as outcome could change
 
-# Only Predictor is golfer
-# Every player should have at least 2 rounds
-
-# Increase number of draws and then take an average and mean for each - 100 samples not that much
-transpose = pp_test_set['golfer_to_par'].T
-transpose_r = pp_test_rounded['golfer_to_par'].T
 
