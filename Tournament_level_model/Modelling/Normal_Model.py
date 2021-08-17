@@ -69,19 +69,13 @@ num_courses = len(training_data.i_course.drop_duplicates())
 #Normal Distribution
 with pm.Model() as model:
     #Hyper Priors - need to use conjugate priors
-    # Inverse gamma is conjugate for Normal variance
-    # Normal is conjugate prior for normal mean
-    mean_golfer_sd  = pm.Uniform('mean_golfer_sd',lower=0, upper=10)
+
+    mean_golfer_sd  = pm.Uniform('mean_golfer_sd',lower=0, upper=5)
     mean_golfer_mu = pm.Normal('mean_golfer_mu', mu=0, sigma=1)
-    # Conjugate prior for inverse gamma is gamma??
-    # Try uniform - weak priors
-    #sd_golfer_beta = pm.Uniform('sd_golfer_beta', lower=0,upper=10)
-    #sd_golfer_alpha = pm.Uniform('sd_golfer_alpha', lower=0,upper=10)
-    
     # golfer specific parameters
     mean_golfer = pm.Normal('mean_golfer', mu=mean_golfer_mu, sigma=mean_golfer_sd, shape=num_golfers)
     #standard deviation for each golfer - Inverse gamma is prior for standard deviation
-    sd_golfer = pm.Uniform('sd_golfer',lower=0, upper=10, shape=num_golfers)     
+    sd_golfer = pm.Uniform('sd_golfer',lower=0, upper=5, shape=num_golfers)     
     # Observed scores to par follow normal distribution
     golfer_to_par = pm.Normal("golfer_to_par", mu=mean_golfer[observed_golfers_shared], sigma=sd_golfer[observed_golfers_shared], observed=observed_round_score)
     # Prior Predictive checks - generate samples without taking data
@@ -114,9 +108,7 @@ ax.set_ylabel("Round Score to Par")
 ax.set_title("Observations vs Prior Predictive")
 ax.legend(fontsize=10, frameon=True, framealpha=0.5,loc='upper right',bbox_to_anchor=(1, 1))
 
-
-
-    
+ 
 #Set cores to 1
 # Tuning samples will be discarded
 with model:
@@ -159,14 +151,40 @@ pp_train_rounded = {'golfer_to_par': pp_train['golfer_to_par'].round(0)}
 transposed_rounded = pp_train_rounded['golfer_to_par'].T
 scores_rounded = pd.DataFrame(transposed_rounded)
 
+value_counts = scores_rounded.apply(pd.Series.value_counts)
+value_counts_rows = pd.DataFrame(value_counts.sum(axis=1))
+value_counts_rows['pct'] = value_counts_rows[0] / value_counts_rows[0].sum()
+
+
 # Reset index on training dataset
 training_data_reset = training_data.reset_index(drop=True)
 
 # HDI chart that works - reset training index
 # Function takes hdi of each column
 az.plot_hdi(training_data_reset.index,  pp_train_rounded['golfer_to_par'])
-
+# Actual scores
 actual_scores = training_data_reset.Round_Score.reset_index(drop=True)
+# Get group by scores
+actual_scores_grp = pd.DataFrame(actual_scores.value_counts())
+actual_scores_grp['pct'] = actual_scores_grp['Round_Score'] / actual_scores_grp['Round_Score'].sum()
+
+
+# Plot Bar chart (categories) rather than histogram (continous)
+import matplotlib.pyplot as plt
+
+# Plot actual  vs Simulated values
+# Follows Normal Distribution quite well
+fig = plt.figure()
+ax = fig.add_axes([0,0,1,1])
+scores_sim = value_counts_rows.index
+percentage_sim = value_counts_rows['pct']
+scores_a = actual_scores_grp.index
+percentage_a = actual_scores_grp['pct']
+ax.bar(scores_a,percentage_a,color='dodgerblue',label='Actual')
+ax.bar(scores_sim,percentage_sim,color='none',edgecolor='r', label='Sim')
+plt.legend()
+plt.show()
+
 
 
 # Plot Chart for all golfers
@@ -179,8 +197,6 @@ ax.set_xlabel("Observation")
 ax.set_ylabel("Round Score to Par")
 ax.set_title("Observations vs Posterior Predictive")
 ax.legend(fontsize=10, frameon=True, framealpha=0.5,loc='upper right',bbox_to_anchor=(1, 1))
-
-
 
 
 # Get Shane Lowry Values
@@ -229,8 +245,6 @@ ax.legend(fontsize=10, frameon=True, framealpha=0.5,loc='upper right',bbox_to_an
 # Check to see if model can reproduce patterns observed in real data
 az.plot_ppc(az.from_pymc3(posterior_predictive=pp_train_rounded, model=model));
 
-
-
 # Set values for Model as test set
 # Have 6687 values
 observed_golfers_shared.set_value(observed_golfers_test)
@@ -246,26 +260,58 @@ pp_test_rounded = {'golfer_to_par': pp_test_set['golfer_to_par'].round(0)}
 # Could be lower as used shared
 az.plot_ppc(az.from_pymc3(posterior_predictive=pp_test_rounded, model=model));
 
-import matplotlib as plt
+#Put scores into dataframe
+test_scores_df = pd.DataFrame(pp_test_rounded['golfer_to_par'].T)
+# Transpose scores
+t_test_scores_df = test_scores_df.T
+# Get actual scores
+actual_test = test_data.Round_Score.reset_index(drop=True)
 
-golfer_0 = pp_test_rounded['golfer_to_par'][:, 0]
+# Get index for prior scores rounded
+test_indices = test_scores_df.index
 
-plt.hist(golfer_0, bins=50, color='tab:blue')
+# Get mean of prior scores rounded
+test_mean = test_scores_df.mean(axis=1)
+
+# Plot Chart for all golfers for Test set 94%
+_, ax = plt.subplots()
+az.plot_hdi(test_indices , t_test_scores_df, hdi_prob=0.94, fill_kwargs={"alpha": 0.8, "label": "Test set Pred 94% HDI"})
+# Get mean of each column of predicted outcomes
+ax.plot(test_indices , test_mean, label="Mean Test Pred", alpha=0.8)
+ax.plot(test_indices , actual_test, "x", ms=4, alpha=0.6,color="black", label="Actual Data")
+ax.set_xlabel("Observation") 
+ax.set_ylabel("Round Score to Par")
+ax.set_title("Observations vs Test set Prediction")
+ax.legend(fontsize=10, frameon=True, framealpha=0.5,loc='upper right',bbox_to_anchor=(1, 1))
+
+# Plot Chart for 99.999%
+_, ax = plt.subplots()
+az.plot_hdi(test_indices , t_test_scores_df, hdi_prob=0.99999, fill_kwargs={"alpha": 0.8, "label": "Test set Pred 94% HDI"})
+# Get mean of each column of predicted outcomes
+ax.plot(test_indices , test_mean, label="Mean Test Pred", alpha=0.8)
+ax.plot(test_indices , actual_test, "x", ms=4, alpha=0.6,color="black", label="Actual Data")
+ax.set_xlabel("Observation") 
+ax.set_ylabel("Round Score to Par")
+ax.set_title("Observations vs Test set Prediction")
+ax.legend(fontsize=10, frameon=True, framealpha=0.5,loc='upper right',bbox_to_anchor=(1, 1))
+
+scores_hdi_test = az.hdi(pp_test_rounded['golfer_to_par'],hdi_prob=0.94)
+scores_hdi_99999_test = az.hdi(pp_test_rounded['golfer_to_par'],hdi_prob=0.99999)
+
+# Calculate percentage of golfers obs outside 94%
+hdi_actual_test = pd.merge(pd.DataFrame(actual_test),pd.DataFrame(scores_hdi_test),left_index=True,right_index=True)
+hdi_actual_test.loc[(hdi_actual_test['Round_Score'] >= hdi_actual_test[0]) & (hdi_actual_test['Round_Score'] <= hdi_actual_test[1]) , 'Check_between'] = 1
+hdi_actual_test.loc[(hdi_actual_test['Round_Score'] < hdi_actual_test[0]) | (hdi_actual_test['Round_Score'] > hdi_actual_test[1]) , 'Check_between'] = 0
+print('count obs outside',(hdi_actual_test.Check_between.count() - hdi_actual_test.Check_between.sum()))
+print('obs in 94%: ',hdi_actual_test.Check_between.sum()/hdi_actual_test.Check_between.count())
+
+# Calculate percentage of golfers obs outside 99.999%
+# 3 obs outside with each golfer having nu and golfer having sd
+hdi_actual_99999_test = pd.merge(pd.DataFrame(actual_test),pd.DataFrame(scores_hdi_99999_test),left_index=True,right_index=True)
+hdi_actual_99999_test.loc[(hdi_actual_99999_test['Round_Score'] >= hdi_actual_99999_test[0]) & (hdi_actual_99999_test['Round_Score'] <= hdi_actual_99999_test[1]) , 'Check_between'] = 1
+hdi_actual_99999_test.loc[(hdi_actual_99999_test['Round_Score'] < hdi_actual_99999_test[0]) | (hdi_actual_99999_test['Round_Score'] > hdi_actual_99999_test[1]) , 'Check_between'] = 0
+print('count obs outside',(hdi_actual_99999_test.Check_between.count() - hdi_actual_99999_test.Check_between.sum()))
+print('obs in 99.999%: ',hdi_actual_99999_test.Check_between.sum()/hdi_actual_99999_test.Check_between.count())
 
 
-# Next step Simulate Tournaments
-
-list_of_tournaments = test_data['tournament name'].unique()
-
-masters_scores = test_data[test_data['tournament name']=='Masters Tournament']['Round_Score']
-masters_golfers = test_data[test_data['tournament name']=='Masters Tournament']['i_golfer']
-
-# Draw from Posterior - Can't use Test Set Posterior as outcome could change
-
-# Only Predictor is golfer
-# Every player should have at least 2 rounds
-
-# Increase number of draws and then take an average and mean for each - 100 samples not that much
-transpose = pp_test_set['golfer_to_par'].T
-transpose_r = pp_test_rounded['golfer_to_par'].T
 

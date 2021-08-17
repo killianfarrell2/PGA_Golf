@@ -84,12 +84,12 @@ with pm.Model() as model:
     # golfer specific parameters
     mean_golfer = pm.Normal('mean_golfer', mu=-6, sigma=3, shape=num_golfers)
     #standard deviation for each golfer - Inverse gamma is prior for standard deviation
-    sd_golfer = pm.HalfNormal('sd_golfer',sigma=3)     
-    #Exponential parameter
+    sd_golfer = pm.HalfNormal('sd_golfer',sigma=3,shape=num_golfers)     
+    #Exponential parameter - 1 for each golfer
     #nu_golfer = pm.Gamma('nu_golfer',alpha=1, beta=1,shape=num_golfers)
-    nu_golfer = pm.Uniform('nu_golfer',lower=0,upper=10,shape=num_golfers)
+    nu_golfer = pm.Uniform('nu_golfer',lower=0,upper=10)
     # Mean = nu + mu (this should be larger than mode of -1)
-    golfer_to_par = pm.ExGaussian("golfer_to_par", nu=nu_golfer[observed_golfers_shared], mu=mean_golfer[observed_golfers_shared], sigma=sd_golfer, observed=observed_round_score)
+    golfer_to_par = pm.ExGaussian("golfer_to_par", nu=nu_golfer, mu=mean_golfer[observed_golfers_shared], sigma=sd_golfer[observed_golfers_shared], observed=observed_round_score)
     # Prior Predictive checks - generate samples without taking data
     prior_checks = pm.sample_prior_predictive(samples=1000, random_seed=1234)
 
@@ -124,6 +124,7 @@ ax.legend(fontsize=10, frameon=True, framealpha=0.5,loc='upper right',bbox_to_an
 
 #Set cores to 1
 # Tuning samples will be discarded
+# Getting divergences when there is 1 skew parameter for each golfer
 with model:
     trace = pm.sample(1000,chains=2, tune=1000, cores=1,random_seed=1234)
 
@@ -140,8 +141,8 @@ df_trace = pm.trace_to_dataframe(trace)
 # Bayesian fraction of missing information
 # Gelman rubin - evaluates difference between multiple markov chains
 # Want to see value of less than 1.1 - want to have 1 ideally
-# BFMI 0.96
-# GR: 1.012
+# BFMI 0.906
+# GR: 1.0086
 bfmi = np.max(pm.stats.bfmi(trace))
 max_gr = max(np.max(gr_stats) for gr_stats in pm.stats.rhat(trace).values()).values
 
@@ -161,6 +162,11 @@ pp_train_rounded = {'golfer_to_par': pp_train['golfer_to_par'].round(0)}
 transposed_rounded = pp_train_rounded['golfer_to_par'].T
 scores_rounded = pd.DataFrame(transposed_rounded)
 
+value_counts = scores_rounded.apply(pd.Series.value_counts)
+value_counts_rows = pd.DataFrame(value_counts.sum(axis=1))
+value_counts_rows['pct'] = value_counts_rows[0] / value_counts_rows[0].sum()
+
+
 # Reset index on training dataset
 training_data_reset = training_data.reset_index(drop=True)
 
@@ -169,6 +175,26 @@ training_data_reset = training_data.reset_index(drop=True)
 az.plot_hdi(training_data_reset.index,  pp_train_rounded['golfer_to_par'])
 
 actual_scores = training_data_reset.Round_Score.reset_index(drop=True)
+# Get group by scores
+actual_scores_grp = pd.DataFrame(actual_scores.value_counts())
+actual_scores_grp['pct'] = actual_scores_grp['Round_Score'] / actual_scores_grp['Round_Score'].sum()
+
+# Plot Bar chart (categories) rather than histogram (continous)
+import matplotlib.pyplot as plt
+
+# Plot actual  vs Simulated values
+# Follows Normal Distribution quite well
+fig = plt.figure()
+ax = fig.add_axes([0,0,1,1])
+scores_sim = value_counts_rows.index
+percentage_sim = value_counts_rows['pct']
+scores_a = actual_scores_grp.index
+percentage_a = actual_scores_grp['pct']
+ax.bar(scores_a,percentage_a,color='dodgerblue',label='Actual')
+ax.bar(scores_sim,percentage_sim,color='none',edgecolor='r', label='Sim')
+plt.legend()
+plt.show()
+
 
 scores_hdi = az.hdi(pp_train_rounded['golfer_to_par'],hdi_prob=0.94)
 scores_hdi_99999 = az.hdi(pp_train_rounded['golfer_to_par'],hdi_prob=0.99999)
@@ -223,7 +249,7 @@ test_indices = test_scores_df.index
 # Get mean of prior scores rounded
 test_mean = test_scores_df.mean(axis=1)
 
-# Plot Chart for all golfers for Test set
+# Plot Chart for all golfers for Test set 94%
 _, ax = plt.subplots()
 az.plot_hdi(test_indices , t_test_scores_df, hdi_prob=0.94, fill_kwargs={"alpha": 0.8, "label": "Test set Pred 94% HDI"})
 # Get mean of each column of predicted outcomes
@@ -234,8 +260,36 @@ ax.set_ylabel("Round Score to Par")
 ax.set_title("Observations vs Test set Prediction")
 ax.legend(fontsize=10, frameon=True, framealpha=0.5,loc='upper right',bbox_to_anchor=(1, 1))
 
+# Plot Chart for 99.999%
+_, ax = plt.subplots()
+az.plot_hdi(test_indices , t_test_scores_df, hdi_prob=0.99999, fill_kwargs={"alpha": 0.8, "label": "Test set Pred 94% HDI"})
+# Get mean of each column of predicted outcomes
+ax.plot(test_indices , test_mean, label="Mean Test Pred", alpha=0.8)
+ax.plot(test_indices , actual_test, "x", ms=4, alpha=0.6,color="black", label="Actual Data")
+ax.set_xlabel("Observation") 
+ax.set_ylabel("Round Score to Par")
+ax.set_title("Observations vs Test set Prediction")
+ax.legend(fontsize=10, frameon=True, framealpha=0.5,loc='upper right',bbox_to_anchor=(1, 1))
 
 
+
+scores_hdi_test = az.hdi(pp_test_rounded['golfer_to_par'],hdi_prob=0.94)
+scores_hdi_99999_test = az.hdi(pp_test_rounded['golfer_to_par'],hdi_prob=0.99999)
+
+# Calculate percentage of golfers obs outside 94%
+hdi_actual_test = pd.merge(pd.DataFrame(actual_test),pd.DataFrame(scores_hdi_test),left_index=True,right_index=True)
+hdi_actual_test.loc[(hdi_actual_test['Round_Score'] >= hdi_actual_test[0]) & (hdi_actual_test['Round_Score'] <= hdi_actual[1]) , 'Check_between'] = 1
+hdi_actual_test.loc[(hdi_actual_test['Round_Score'] < hdi_actual_test[0]) | (hdi_actual_test['Round_Score'] > hdi_actual[1]) , 'Check_between'] = 0
+print('count obs outside',(hdi_actual_test.Check_between.count() - hdi_actual_test.Check_between.sum()))
+print('obs in 94%: ',hdi_actual_test.Check_between.sum()/hdi_actual_test.Check_between.count())
+
+# Calculate percentage of golfers obs outside 99.999%
+# 3 obs outside with each golfer having nu and golfer having sd
+hdi_actual_99999_test = pd.merge(pd.DataFrame(actual_test),pd.DataFrame(scores_hdi_99999_test),left_index=True,right_index=True)
+hdi_actual_99999_test.loc[(hdi_actual_99999_test['Round_Score'] >= hdi_actual_99999_test[0]) & (hdi_actual_99999_test['Round_Score'] <= hdi_actual_99999_test[1]) , 'Check_between'] = 1
+hdi_actual_99999_test.loc[(hdi_actual_99999_test['Round_Score'] < hdi_actual_99999_test[0]) | (hdi_actual_99999_test['Round_Score'] > hdi_actual_99999_test[1]) , 'Check_between'] = 0
+print('count obs outside',(hdi_actual_99999_test.Check_between.count() - hdi_actual_99999_test.Check_between.sum()))
+print('obs in 99.999%: ',hdi_actual_99999_test.Check_between.sum()/hdi_actual_99999_test.Check_between.count())
 
 
 
