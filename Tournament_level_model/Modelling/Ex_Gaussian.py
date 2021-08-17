@@ -166,7 +166,6 @@ value_counts = scores_rounded.apply(pd.Series.value_counts)
 value_counts_rows = pd.DataFrame(value_counts.sum(axis=1))
 value_counts_rows['pct'] = value_counts_rows[0] / value_counts_rows[0].sum()
 
-
 # Reset index on training dataset
 training_data_reset = training_data.reset_index(drop=True)
 
