@@ -2,6 +2,10 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import theano.tensor as tt
 import numpy as np
+import matplotlib.pyplot as plt
+import scipy.stats as sc
+from scipy.stats import norm
+import statistics
 
 #Import Tournament data
 data_location = 'D:\\KF_Repo\\PGA_Golf\\Tournament_level_model\\Data_manipulation\\model_data.csv'
@@ -62,53 +66,39 @@ data = pd.merge(data, avg_score, left_on=["tournament id",'round_date'], right_o
 data['St_V_Avg'] =  data["Round_Score"] - data["Avg_Score"] 
 
 
-#Split into training data with rough 80:20 split
-training_data = data[data['date'] <'2020-10-01']
-test_data = data[data['date'] >='2020-10-01']
-
-# Select columns needed
-subset = training_data[['player','i_golfer','tournament id','date','course','Round','Round_Score']]
-# Divide into rounds
-r1= subset[subset['Round']==1][['player','i_golfer','tournament id','date','course','Round_Score']]
-r2= subset[subset['Round']==2][['i_golfer','tournament id','Round_Score']]
-r3= subset[subset['Round']==3][['i_golfer','tournament id','Round_Score']]
-r4= subset[subset['Round']==4][['i_golfer','tournament id','Round_Score']]
-
-# Rename columns
-r1 = r1.rename(columns={'Round_Score': "R1"})
-r2 = r2.rename(columns={'Round_Score': "R2"})
-r3 = r3.rename(columns={'Round_Score': "R3"})
-r4 = r4.rename(columns={'Round_Score': "R4"})
-
-# Combine rounds
-combine_rounds = pd.merge(r1, r2, on=['i_golfer','tournament id'],how="left")
-combine_rounds = pd.merge(combine_rounds, r3, on=['i_golfer','tournament id'],how="left")
-combine_rounds = pd.merge(combine_rounds, r4, on=['i_golfer','tournament id'],how="left")
+mu_graph = data['St_V_Avg'].mean()
+print(mu_graph)
+median_graph = data['St_V_Avg'].median()
+print(median_graph)
+std_graph = data['St_V_Avg'].std()
+print(std_graph)
+min_score = data['St_V_Avg'].min()
+print(min_score)
+max_score = data['St_V_Avg'].max()
+print(max_score)
+skew =data['St_V_Avg'].skew()
+print(skew)
+kurtosis =data['St_V_Avg'].kurtosis()
+print(kurtosis)
+length = len(data['Round_Score'])
+print(length)
 
 
-# Filter for rounds where we have both R1 and R2
-filter_rounds = combine_rounds[combine_rounds['R1'].notnull()]
-filter_rounds = filter_rounds[filter_rounds['R2'].notnull()]
+x_axis = np.arange(-15, 15, 0.1)
 
+# the histogram of the data vs Normal Distribution
 
-# Correlation coefficient of 0.2
-print('Corr coeff ',filter_rounds['R1'].corr(filter_rounds['R2']))
-
-
-# Scatter plot matplotlib
-plt.scatter(filter_rounds.R1, filter_rounds.R2,label=f'R1-R2 Correlation = {np.round(np.corrcoef(filter_rounds.R1,filter_rounds.R2)[0,1], 2)}')
-plt.title('R1 vs R2 Scores')
-plt.xlabel('R1')
-plt.ylabel('R2')
-plt.legend()
+plt.hist(data['St_V_Avg'].values, 20, density=True, facecolor='b', alpha=0.75)
+plt.plot(x_axis, norm.pdf(x_axis, mu_graph, std_graph))
+plt.xlabel('Score vs Avg')
+plt.ylabel('Probability')
+plt.title('Histogram of Scores vs avg')
+plt.text(0, 0.15, r'$\mu=0,\ \sigma=2.84,skew=0.30$')
+plt.xlim(-15, 15)
+plt.ylim(0, 0.20)
+plt.grid(True)
 plt.show()
 
-
-import seaborn as sns
-plt.rcParams.update({'figure.figsize':(10,8), 'figure.dpi':100})
-sns.lmplot(x='R1', y='R2', data=filter_rounds)
-plt.title("Scatter Plot with Linear fit")
-plt.show()
 
 
 

@@ -63,6 +63,8 @@ avg_score = avg_score.rename(columns={"Round_Score": "Avg_Score"})
 # Add average score
 data = pd.merge(data, avg_score, left_on=["tournament id",'round_date'], right_on=["tournament id",'round_date'], how="left")
 # Get performance vs avg of field
+# This will change each tournament depending on field
+# Seamus Power 2nd in SG in barbasol but 50th in SG that year
 data['St_V_Avg'] =  data["Round_Score"] - data["Avg_Score"] 
 
 
