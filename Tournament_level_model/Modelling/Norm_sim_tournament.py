@@ -13,6 +13,16 @@ from theano import shared
 data_location = 'D:\\KF_Repo\\PGA_Golf\\Tournament_level_model\\Data_manipulation\\model_data.csv'
 data = pd.read_csv(data_location)
 
+# Get count of rounds
+g_count = pd.DataFrame(data.groupby("player")['hole_par'].count())
+g_count = g_count.rename(columns={"hole_par": "Count_rounds"})
+
+# Join count column
+data = pd.merge(data, g_count, left_on="player", right_index=True, how="left")
+
+#Filter out golfers with less than 28 rounds played
+data = data[data["Count_rounds"]>=28]
+
 #Drop column player id - Can't use player ID - get index 9621 is out of bounds error
 data = data.drop(columns=['player id'])
 
@@ -26,22 +36,28 @@ golfers = training_data.player.unique()
 golfers = pd.DataFrame(golfers, columns=["golfer"])
 golfers["i"] = golfers.index
 
-# Get golfers from test set
-golfers_test = test_data.player.unique()
-
 # Add i column back to dataframe
 training_data = pd.merge(training_data, golfers, left_on="player", right_on="golfer", how="left")
 training_data = training_data.rename(columns={"i": "i_golfer"}).drop("golfer", 1)
 
-# Create new column i_course
-courses = training_data.course.unique()
-courses = pd.DataFrame(courses, columns=["course"])
-courses["i"] = courses.index
+
+# Get golfers from test set
+golfers_test = pd.DataFrame(test_data.player.unique())
+# Rename column
+golfers_test = golfers_test.rename(columns={0: "golfer"})
+
+# Drop golfers that are already in golfers
+cond = golfers_test["golfer"].isin(golfers['golfer'])
+golfers_test.drop(golfers_test[cond].index, inplace = True)
+
+
+# Add new golfers to golfers dataframe
+golfers = golfers.append(golfers_test, ignore_index=True)
+golfers["i"] = golfers.index
 
 # Add i column back to dataframe
-training_data = pd.merge(training_data, courses, left_on="course", right_on="course", how="left")
-training_data = training_data.rename(columns={"i": "i_course"})
-
+test_data = pd.merge(test_data, golfers, left_on="player", right_on="golfer", how="left")
+test_data = test_data.rename(columns={"i": "i_golfer"}).drop("golfer", 1)
 
 
 # Get Round 1 entries for each tournament
@@ -54,14 +70,13 @@ observed_golfers = training_data.i_golfer.values
 observed_golfers_shared = shared(observed_golfers)
 # Get values for golfers from test set Round 1
 observed_golfers_test = test_r1.i_golfer.values
+
 # Get observed scores to use for model
 observed_round_score = training_data.Round_Score.values
-# Get ovserved course that could be used for model
-observed_courses = training_data.i_course.values
 
 #Get unique number of golfers - shape will be ok below
 num_golfers = len(training_data.i_golfer.drop_duplicates())
-num_courses = len(training_data.i_course.drop_duplicates())
+
 
 #Normal Distribution
 with pm.Model() as model:
@@ -93,8 +108,7 @@ with model:
 pp_train_rounded = {'golfer_to_par': pp_train['golfer_to_par'].round(0)}
 
 
-# Set values for Model as test set
-# Have 6687 values
+# Set values for Model as test set for round 1
 observed_golfers_shared.set_value(observed_golfers_test)
 
 #Output is decimal number score to par - need to add to par and then round
