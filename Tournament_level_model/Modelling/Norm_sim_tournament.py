@@ -99,14 +99,6 @@ with pm.Model() as model:
 with model:
     trace = pm.sample(1000,chains=2, tune=1000, cores=1,random_seed=1234)
 
-
-# Sample Posterior predictive
-with model:
-    pp_train = pm.sample_posterior_predictive(trace,samples=1000)
-
-# Round scores to the nearest whole number
-pp_train_rounded = {'golfer_to_par': pp_train['golfer_to_par'].round(0)}
-
 # Set values for Model as test set for round 1
 observed_golfers_shared.set_value(observed_golfers_test)
 
@@ -118,7 +110,6 @@ with model:
 # Round scores to the nearest whole number
 # Have 100 simulations for each golfer for each tournament
 pp_test_rounded = {'golfer_to_par': pp_test_set['golfer_to_par'].round(0)}
-
 
 def sim_score(Round):
         draw = np.random.randint(0,num_samples)
@@ -133,83 +124,98 @@ def top_x(x,df,i):
         top_x['sim_number'] = i
         return top_x
 
-
+def get_percent(df,string):
+    counts = pd.DataFrame(df['player'].value_counts())
+    counts = counts.rename(columns={'player': "Count_"+str(string)})
+    num_sims = df['sim_number'].nunique()
+    counts['percent_'+str(string)] = counts["Count_"+str(string)]/num_sims
+    return counts
 
     
-
-# Start tournament simulation
-# Create empty dataframe
-store_winners = pd.DataFrame()
-store_top_5 = pd.DataFrame()
-store_top_10 = pd.DataFrame()
-store_top_20 = pd.DataFrame()
-
-# Run for number of simulations specified below
-for i in range(1):
-         
-        # Select random draw from simulated scores to get round 1 and round 2 scores
-        scores_r1 = sim_score("R1")
-        scores_r2 = sim_score("R2")
-        scores_r3 = sim_score("R3")
-        scores_r4 = sim_score("R4")
-        
-        # get extra details from tournament
-        scores_plus = tournament_r1[['player','tournament name','tournament id','made_cut']].reset_index(drop=True)
-        # merge scores back
-        scores = pd.merge(scores_plus,scores_r1,left_index=True,right_index=True)
-        scores = pd.merge(scores,scores_r2,left_index=True,right_index=True)
-        scores = pd.merge(scores,scores_r3,left_index=True,right_index=True)
-        scores = pd.merge(scores,scores_r4,left_index=True,right_index=True)
-        
-        # Add round 1 and roound 2 scores
-        scores['total_r1_r2'] = scores['R1'] + scores['R2']
-        # Get rank after day 2
-        scores['rank_r1_r2'] = scores['total_r1_r2'].rank(method='min')
-        # Top 50 make cut and ties for augusta
-        missed_cut = scores[scores['rank_r1_r2']> 50]
-        # Drop round 3 and round 4 scores from players who didn't make the cut
-        missed_cut = missed_cut.drop(columns=['R3', 'R4'])
-        
-        # Get players who made cut
-        made_cut = scores[scores['rank_r1_r2']<= 50]
-        # Get final score
-        made_cut['final_score'] = made_cut['total_r1_r2'] + made_cut['R3'] + made_cut['R4']
-        # Get final rank
-        made_cut['rank_final'] = made_cut['final_score'].rank(method='min')
-        
-        # Select Winner
-        winner = top_x(1,made_cut,i)
-        
-        # If more than 1 player finishes on top score - select winner at random (playoff)
-        if winner.shape[0] > 1:
-            rand_row = np.random.randint(0,winner.shape[0])
-            winner = winner[rand_row:rand_row+1]
-        
-        # Select top 5, top 10, top 20
-        top_5 = top_x(5,made_cut,i)
-        top_10 = top_x(10,made_cut,i)
-        top_20 = top_x(10,made_cut,i)
+def sim_tournament(num_simulations):
     
-        # Append to dataframe
-        store_winners = store_winners.append(winner)
-        store_top_5 = store_top_5.append(top_5)
-        store_top_10 = store_top_10.append(top_10)
-        store_top_20 = store_top_20.append(top_20)
-        
-        print(i)
-
-# Get count number of times each player won the tournament
-player_odds = pd.DataFrame(store_winners['player'].value_counts())
-player_odds = player_odds.rename(columns={'player': "Count_Wins"})
-
-# Get percentage chance
-# Need to do calibration to check accuracy of percentages
-# Highest percentage is 4% which is 25/1 odds
-# Lowest is 0.0006 which is 1666/1 - seems too high
-player_odds['percent_win'] = player_odds["Count_Wins"]/player_odds["Count_Wins"].sum()
+    # Start tournament simulation
+    # Create empty dataframe
+    store_winners = pd.DataFrame()
+    store_top_5 = pd.DataFrame()
+    store_top_10 = pd.DataFrame()
+    store_top_20 = pd.DataFrame()
+    store_made_cut = pd.DataFrame()
     
+    # Run for number of simulations specified below
+    for i in range(num_simulations):
+             
+            # Select random draw from simulated scores to get round 1 and round 2 scores
+            scores_r1 = sim_score("R1")
+            scores_r2 = sim_score("R2")
+            scores_r3 = sim_score("R3")
+            scores_r4 = sim_score("R4")
+            
+            # get extra details from tournament
+            scores_plus = tournament_r1[['player','tournament name','tournament id','made_cut']].reset_index(drop=True)
+            # merge scores back
+            scores = pd.merge(scores_plus,scores_r1,left_index=True,right_index=True)
+            scores = pd.merge(scores,scores_r2,left_index=True,right_index=True)
+            scores = pd.merge(scores,scores_r3,left_index=True,right_index=True)
+            scores = pd.merge(scores,scores_r4,left_index=True,right_index=True)
+            
+            # Add round 1 and roound 2 scores
+            scores['total_r1_r2'] = scores['R1'] + scores['R2']
+            # Get rank after day 2
+            scores['rank_r1_r2'] = scores['total_r1_r2'].rank(method='min')
+            # Top 50 make cut and ties for augusta
+            missed_cut = scores[scores['rank_r1_r2']> 50]
+            # Drop round 3 and round 4 scores from players who didn't make the cut
+            missed_cut = missed_cut.drop(columns=['R3', 'R4'])
+            
+            # Get players who made cut
+            made_cut = scores[scores['rank_r1_r2']<= 50]
+            # Get final score
+            made_cut['final_score'] = made_cut['total_r1_r2'] + made_cut['R3'] + made_cut['R4']
+            # Get final rank
+            made_cut['rank_final'] = made_cut['final_score'].rank(method='min')
+            
+            # Select Winner
+            winner = top_x(1,made_cut,i)
+            
+            # If more than 1 player finishes on top score - select winner at random (playoff)
+            if winner.shape[0] > 1:
+                rand_row = np.random.randint(0,winner.shape[0])
+                winner = winner[rand_row:rand_row+1]
+            
+            # Select top 5, top 10, top 20, made_cut
+            top_5 = top_x(5,made_cut,i)
+            top_10 = top_x(10,made_cut,i)
+            top_20 = top_x(20,made_cut,i)
+            top_cut = top_x(1000,made_cut,i)
+        
+            # Append to dataframe
+            store_winners = store_winners.append(winner)
+            store_top_5 = store_top_5.append(top_5)
+            store_top_10 = store_top_10.append(top_10)
+            store_top_20 = store_top_20.append(top_20)
+            store_made_cut = store_made_cut.append(top_cut)
+            
+            print(i)
+    
+     # To get winner just need to count how many times out of 10k simulations he won 
+    win_percent =  get_percent(store_winners,"win")
+    top_5_percent = get_percent(store_top_5,"5")
+    top_10_percent =  get_percent(store_top_10,"10")
+    top_20_percent = get_percent(store_top_20,"20")
+    cut_percent = get_percent(store_made_cut,"cut")
+    
+    # Merge results
+    results_sim = pd.merge(win_percent,top_5_percent,left_index=True,right_index=True,how='outer')
+    results_sim = pd.merge(results_sim,top_10_percent,left_index=True,right_index=True,how='outer')
+    results_sim = pd.merge(results_sim,top_20_percent,left_index=True,right_index=True,how='outer')
+    results_sim = pd.merge(results_sim,cut_percent,left_index=True,right_index=True,how='outer')
+
+    return results_sim
 
 
+
+results_all = sim_tournament(2)
 
 
 
