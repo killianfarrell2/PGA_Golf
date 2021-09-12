@@ -119,31 +119,39 @@ with model:
 # Have 100 simulations for each golfer for each tournament
 pp_test_rounded = {'golfer_to_par': pp_test_set['golfer_to_par'].round(0)}
 
-       
+
+def sim_score(Round):
+        draw = np.random.randint(0,num_samples)
+        scores = pd.DataFrame(pp_test_rounded['golfer_to_par'][draw,:])
+        scores = scores.rename(columns={0: Round})
+        return scores
+
+# Return Top X
+def top_x(x,df,i):
+        top_x = df[df['rank_final']<=x].reset_index(drop=True)
+        top_x = top_x[['player','final_score','rank_final']]
+        top_x['sim_number'] = i
+        return top_x
+
+
+
+    
 
 # Start tournament simulation
 # Create empty dataframe
 store_winners = pd.DataFrame()
+store_top_5 = pd.DataFrame()
+store_top_10 = pd.DataFrame()
+store_top_20 = pd.DataFrame()
 
 # Run for number of simulations specified below
-for i in range(10000):
+for i in range(1):
          
         # Select random draw from simulated scores to get round 1 and round 2 scores
-        draw_r1 = np.random.randint(0,num_samples)
-        scores_r1 = pd.DataFrame(pp_test_rounded['golfer_to_par'][draw_r1,:])
-        scores_r1 = scores_r1.rename(columns={0: "R1"})
-        
-        draw_r2 = np.random.randint(0,num_samples)
-        scores_r2 = pd.DataFrame(pp_test_rounded['golfer_to_par'][draw_r2,:])
-        scores_r2 = scores_r2.rename(columns={0: "R2"})
-        
-        draw_r3 = np.random.randint(0,num_samples)
-        scores_r3 = pd.DataFrame(pp_test_rounded['golfer_to_par'][draw_r3,:])
-        scores_r3 = scores_r3.rename(columns={0: "R3"})
-        
-        draw_r4 = np.random.randint(0,num_samples)
-        scores_r4 = pd.DataFrame(pp_test_rounded['golfer_to_par'][draw_r4,:])
-        scores_r4 = scores_r4.rename(columns={0: "R4"})
+        scores_r1 = sim_score("R1")
+        scores_r2 = sim_score("R2")
+        scores_r3 = sim_score("R3")
+        scores_r4 = sim_score("R4")
         
         # get extra details from tournament
         scores_plus = tournament_r1[['player','tournament name','tournament id','made_cut']].reset_index(drop=True)
@@ -170,18 +178,24 @@ for i in range(10000):
         made_cut['rank_final'] = made_cut['final_score'].rank(method='min')
         
         # Select Winner
-        winner = made_cut[made_cut['rank_final']==1].reset_index(drop=True)
-        winner = winner[['player','final_score','rank_final']]
+        winner = top_x(1,made_cut,i)
         
-        # If more than 1 player finishes on top score - select winner at random
+        # If more than 1 player finishes on top score - select winner at random (playoff)
         if winner.shape[0] > 1:
             rand_row = np.random.randint(0,winner.shape[0])
             winner = winner[rand_row:rand_row+1]
         
-        winner['sim_number'] = i
-        
+        # Select top 5, top 10, top 20
+        top_5 = top_x(5,made_cut,i)
+        top_10 = top_x(10,made_cut,i)
+        top_20 = top_x(10,made_cut,i)
+    
         # Append to dataframe
         store_winners = store_winners.append(winner)
+        store_top_5 = store_top_5.append(top_5)
+        store_top_10 = store_top_10.append(top_10)
+        store_top_20 = store_top_20.append(top_20)
+        
         print(i)
 
 # Get count number of times each player won the tournament
