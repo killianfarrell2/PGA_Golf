@@ -13,6 +13,10 @@ from theano import shared
 data_location = 'D:\\KF_Repo\\PGA_Golf\\Tournament_level_model\\Data_manipulation\\model_data.csv'
 data = pd.read_csv(data_location)
 
+# get augusta - missing some amateurs and seniors from data
+augusta = data[data['tournament id']==401219478]
+augusta_r1 = augusta[augusta['Round']==1]
+
 # Get count of rounds
 g_count = pd.DataFrame(data.groupby("player")['hole_par'].count())
 g_count = g_count.rename(columns={"hole_par": "Count_rounds"})
@@ -80,16 +84,20 @@ num_golfers = len(training_data.i_golfer.drop_duplicates())
 
 
 #Normal Distribution
+#Changed to only have 1 standard deviation for all golfers
 with pm.Model() as model:
-
+    # Intercept term for when there is no data for golfers
+    intercept = pm.Normal('intercept', mu=0, sigma=1)
     mean_golfer_sd  = pm.Uniform('mean_golfer_sd',lower=0, upper=5)
     mean_golfer_mu = pm.Normal('mean_golfer_mu', mu=0, sigma=1)
     # golfer specific parameters
     mean_golfer = pm.Normal('mean_golfer', mu=mean_golfer_mu, sigma=mean_golfer_sd, shape=num_golfers)
     #standard deviation for each golfer - Inverse gamma is prior for standard deviation
-    sd_golfer = pm.Uniform('sd_golfer',lower=0, upper=5, shape=num_golfers)     
+    #sd_golfer = pm.Uniform('sd_golfer',lower=0, upper=5, shape=num_golfers)
+    # add in term for mu that includes intercept
+    mu = intercept + mean_golfer[observed_golfers_shared]  
     # Observed scores to par follow normal distribution
-    golfer_to_par = pm.Normal("golfer_to_par", mu=mean_golfer[observed_golfers_shared], sigma=sd_golfer[observed_golfers_shared], observed=observed_round_score)
+    golfer_to_par = pm.Normal("golfer_to_par", mu=mu, sigma=mean_golfer_sd, observed=observed_round_score)
     # Prior Predictive checks - generate samples without taking data
     prior_checks = pm.sample_prior_predictive(samples=1000, random_seed=1234)
 
@@ -222,8 +230,6 @@ results_all = sim_tournament(10000)
 # save simulation as csv
 save_location = 'D:\\KF_Repo\\PGA_Golf\\Tournament_level_model\\Outputs\\masters.csv'
 results_all.to_csv(save_location)  
-
-
 
 
 
