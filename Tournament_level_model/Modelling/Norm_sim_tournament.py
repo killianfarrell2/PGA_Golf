@@ -129,6 +129,7 @@ def get_percent(df,string):
     counts = counts.rename(columns={'player': "Count_"+str(string)})
     num_sims = df['sim_number'].nunique()
     counts['percent_'+str(string)] = counts["Count_"+str(string)]/num_sims
+    counts['odds_'+str(string)] = (1/counts['percent_'+str(string)])-1
     return counts
 
     
@@ -214,8 +215,15 @@ def sim_tournament(num_simulations):
     return results_sim
 
 
+# get simulation results from tournament - tried 1000 but more variety in results
+results_all = sim_tournament(10000)
 
-results_all = sim_tournament(2)
+
+# save simulation as csv
+save_location = 'D:\\KF_Repo\\PGA_Golf\\Tournament_level_model\\Outputs\\masters.csv'
+results_all.to_csv(save_location)  
+
+
 
 
 
