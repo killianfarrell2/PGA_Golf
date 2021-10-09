@@ -1,5 +1,5 @@
 import pandas as pd
-#Downgraded Arviz to 0.11.
+#Downgraded Arviz to 0.11.0
 import pymc3 as pm
 import arviz as az
 import matplotlib.pyplot as plt
@@ -10,7 +10,7 @@ import numpy as np
 from theano import shared
 
 #Import Tournament data
-data_location = 'D:\\KF_Repo\\PGA_Golf\\Tournament_level_model\\Data_manipulation\\model_data.csv'
+data_location = 'C:\\KF_Repo\\PGA_Golf\\Tournament_level_model\\Data_manipulation\\model_data.csv'
 data = pd.read_csv(data_location)
 
 # get augusta - missing some amateurs and seniors from data
