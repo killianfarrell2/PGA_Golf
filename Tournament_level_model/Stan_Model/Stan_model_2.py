@@ -21,16 +21,6 @@ data = data[data["Count_rounds"]>=28]
 #Drop column player id - Can't use player ID - get index 9621 is out of bounds error
 data = data.drop(columns=['player id'])
 
-subset_players = ['Sungjae Im','Brian Stuard',
-'Adam Schenk','Brian Harman',
-'Joel Dahmen','Hideki Matsuyama',
-'J.T. Poston','Chez Reavie',
-'Sebastian Munoz','Billy Horschel']
-
-# Filter out 10 golfers
-data = data[data["player"].isin(subset_players)]
-
-
 #Split into training data with rough 80:20 split
 # Select subset of data for training diagnostics
 training_data = data[data['date'] <'2020-10-01']
@@ -129,117 +119,52 @@ num_courses = len(training_data.i_course.drop_duplicates())
 num_courses_test = len(tournament_r1.i_course.drop_duplicates())
 
 
+
 # Put data in dictionary format for stan
 my_data = {'N':len(observed_round_score),
            'N_pred':len(observed_golfers_test),
            'n_golfers':num_golfers,
            'n_courses':num_courses,
            'y':observed_round_score,
-           'X':observed_golfers,
+           'x':observed_golfers,
            'X_pred':observed_golfers_test,
            'Z':observed_courses,
            'Z_pred':observed_courses_test
            
            }
-#real y[N];// create array with N rows for round scores
-      
 
 my_code = """
 data {
       int N; // number of data points
-      int N_pred; // number of data points in pred set
+     
+      vector[N] y;
       
-      int<lower=0> n_golfers; //number of golfers
-      int<lower=0> n_courses; //number of courses
-      
-      vector[N] y;// create array with N rows for round scores
-      
-      vector[N] X; //golfer codes data values
-      int<lower=0> X_pred[N_pred]; //golfer codes for prediction
-      
-      vector[N] Z; //course codes data values
-      int<lower=0> Z_pred[N_pred]; //course codes for prediction
-      
+      vector[N] x; //golfer codes data values     
 }
 
 parameters {
-        //hyper parameters
-        real mu_golfer;
-        real <lower=0.00001> golfer_mean_sd;
-        real mu_course;
-        real <lower=0.00001> course_mean_sd;
+  real alpha;
+  real beta;
+  real<lower=0.00001> sigma;
         
-        real <lower=0.00001> golfer_sd;
-        real <lower=0.00001> course_sd;
-        
-        // Parameters in Likelihood
-        // Vector[number columns] 
-        vector[n_golfers] golfer_mean; //Coefficient for mean of each golfer
-        vector[n_courses] course_mean; //Coefficient for mean of each course
-        
-          real alpha;
-          real beta;
-          real<lower=0.00001> sigma;
 }
 
 model {
-       //hyper priors - set a wide group
-       mu_golfer ~ normal(0,10);
-       golfer_mean_sd ~ normal(0,10);
-       // Want course affects to be independent of each player
-       // coefficient for augusta will be larger 
-       mu_course ~ normal(0,10);
-       course_mean_sd ~ normal(0,10);
-       course_sd ~ normal(0,10);
-       golfer_sd  ~ normal(0,10);
-       
-       // Get mean of each golfer and course - drawn from same distribution
-       golfer_mean ~ normal(mu_golfer, golfer_mean_sd);
-       course_mean  ~ normal(mu_course, course_mean_sd);
-       
-       //likelihood (Round scores are normally distributed)
-       y ~ normal(alpha + beta * X, sigma);
-     
-}
-
-generated quantities {
-    vector[N] y_pred;// create array with N rows
-    for (n in 1:N)
-    y_pred[n] = normal_rng(alpha + beta * X[n], sigma);
+     y ~ normal(alpha + beta * x, sigma);
         
 }
 
 """
 
-#theta = golfer_mean[X] + course_mean[Z]
 
-# y ~ normal(golfer_mean[X] , golfer_sd) + normal(course_mean[Z], course_sd);
-
-# below will give 1 parameter across all golfers and intercept
-# y ~ normal(alpha + beta * X, sigma);
-
-
-#model {
-#  for (n in 1:N)
-#    y[n] ~ normal(x[n] * beta, sigma);
-#}
-
-
-#// If no data in Test set for golfer then they won't get prediction
-#generated quantities {
-#   vector [n_golfers] golfer_pred_score;
-#    for (n in X_pred)
-#    golfer_pred_score[n] = normal_rng(golfer[n],model_error);      
-#}
-
-
-#real mean_score[N]; //array with N rows
+ # for (n in 1:N)
+ #   y[n] ~ normal(alpha + beta * x[n], sigma);
 
 # Create Model - this will help with recompilation issues
 stan_model = pystan.StanModel(model_code=my_code)
 
 # Call sampling function with data as argument
-fit = stan_model.sampling(data=my_data, iter=2000, chains=4, seed=1,warmup=1000)
+fit = stan_model.sampling(data=my_data, iter=4000, chains=4, seed=1,warmup=2000)
 
 # Put Posterior draws into a dictionary
 params = fit.extract()
