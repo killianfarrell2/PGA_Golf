@@ -128,123 +128,44 @@ num_golfers_test = len(tournament_r1.i_golfer.drop_duplicates())
 num_courses = len(training_data.i_course.drop_duplicates())
 num_courses_test = len(tournament_r1.i_course.drop_duplicates())
 
+# combine golfers and courses into a matrix
+matrix = np.concatenate((observed_golfers.reshape(len(observed_round_score),1) , observed_courses.reshape(len(observed_round_score),1)), axis=1)
+
 
 # Put data in dictionary format for stan
 my_data = {'N':len(observed_round_score),
-           'N_pred':len(observed_golfers_test),
-           'n_golfers':num_golfers,
-           'n_courses':num_courses,
            'y':observed_round_score,
-           'X':observed_golfers,
-           'X_pred':observed_golfers_test,
-           'Z':observed_courses,
-           'Z_pred':observed_courses_test,
-           'K':2
-           
+           'X':matrix,
+           'K':matrix.shape[1]
            }
-#real y[N];// create array with N rows for round scores
-# vector[N] X; //golfer codes 1 for each row
 
 my_code = """
 data {
       int N; // number of data points
-      int N_pred; // number of data points in pred set
-      
-      int<lower=0> n_golfers; //number of golfers
-      int<lower=0> n_courses; //number of courses
-      
       int<lower=0> K;   // number of predictors
       
       // Vectors are column vectors(index from 1, reals only, no ints)
       // Vector is 1 dimensional with N rows
-      vector[N] y;// create array with N rows
-      
-      matrix[N, K] X_Z;   // predictor matrix
-
-      
-      int<lower=0> X_pred[N_pred]; //golfer codes for prediction
-      
-      vector[N] Z; //course codes data values
-      int<lower=0> Z_pred[N_pred]; //course codes for prediction
-      
+      vector[N] y;// create vector with N rows
+      matrix[N, K] X;   // predictor matrix
+ 
 }
 
 parameters {
-        //hyper parameters
-        real mu_golfer;
-        real <lower=0.00001> golfer_mean_sd;
-        real mu_course;
-        real <lower=0.00001> course_mean_sd;
-        
-        real <lower=0.00001> golfer_sd;
-        real <lower=0.00001> course_sd;
-        
-        // Parameters in Likelihood
-        // Vector[number columns] 
-        vector[n_golfers] golfer_mean; //Coefficient for mean of each golfer
-        vector[n_courses] course_mean; //Coefficient for mean of each course
-        
-          real alpha;
-          real beta;
+          real alpha; // intercept;
+          vector[K] beta; // coefficient for predictor - will be 2 rows
           real<lower=0.00001> sigma;
 }
 
 model {
-       //hyper priors - set a wide group
-       mu_golfer ~ normal(0,10);
-       golfer_mean_sd ~ normal(0,10);
-       // Want course affects to be independent of each player
-       // coefficient for augusta will be larger 
-       mu_course ~ normal(0,10);
-       course_mean_sd ~ normal(0,10);
-       course_sd ~ normal(0,10);
-       golfer_sd  ~ normal(0,10);
-       
-       // Get mean of each golfer and course - drawn from same distribution
-       golfer_mean ~ normal(mu_golfer, golfer_mean_sd);
-       course_mean  ~ normal(mu_course, course_mean_sd);
-       
-       //likelihood (Round scores are normally distributed)
-       // below equation is vectorised
-       y ~ normal(alpha + beta*X, sigma);
+     // specify matrix X before Beta coefficients
+     // can't do vector*matrix but can do matrix*vector
+     // result of X*beta is N rows [N,K]*[K] = N
+     y ~ normal(alpha + X * beta, sigma);  // likelihood
      
 }
 
-
 """
-#generated quantities {
-#    vector[N] y_pred;// create array with N rows
-#    for (n in 1:N)
-#    y_pred[n] = normal_rng(alpha + beta * X[n], sigma);
-        
-#}
-
-
-
-
-#theta = golfer_mean[X] + course_mean[Z]
-
-# y ~ normal(golfer_mean[X] , golfer_sd) + normal(course_mean[Z], course_sd);
-
-# below will give 1 parameter across all golfers and intercept
-# y ~ normal(alpha + beta * X, sigma);
-
-
-#model {
-#  for (n in 1:N)
-#    y[n] ~ normal(x[n] * beta, sigma);
-#}
-
-
-#// If no data in Test set for golfer then they won't get prediction
-#generated quantities {
-#   vector [n_golfers] golfer_pred_score;
-#    for (n in X_pred)
-#    golfer_pred_score[n] = normal_rng(golfer[n],model_error);      
-#}
-
-
-#real mean_score[N]; //array with N rows
 
 # Create Model - this will help with recompilation issues
 stan_model = pystan.StanModel(model_code=my_code)
