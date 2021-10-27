@@ -58,7 +58,6 @@ training_data = pd.merge(training_data, courses, left_on="course", right_on="cou
 training_data = training_data.rename(columns={"i": "i_course"}).drop("course", 1)
 
 
-
 # Get golfers from test set
 golfers_test = pd.DataFrame(test_data.player.unique())
 # Rename column
@@ -128,50 +127,49 @@ num_golfers_test = len(tournament_r1.i_golfer.drop_duplicates())
 num_courses = len(training_data.i_course.drop_duplicates())
 num_courses_test = len(tournament_r1.i_course.drop_duplicates())
 
-# combine golfers and courses into a matrix
-matrix = np.concatenate((observed_golfers.reshape(len(observed_round_score),1) , observed_courses.reshape(len(observed_round_score),1)), axis=1)
 
-
-# Put data in dictionary format for stan
-my_data = {'N':len(observed_round_score),
-           'y':observed_round_score,
-           'X':matrix,
-           'K':matrix.shape[1]
-           }
-
-my_code = """
+partial_pooling = """
 data {
-      int N; // number of data points
-      int<lower=0> K;   // number of predictors
-      
-      // Vectors are column vectors(index from 1, reals only, no ints)
-      // Vector is 1 dimensional with N rows
-      vector[N] y;// create vector with N rows
-      matrix[N, K] X;   // predictor matrix
- 
-}
-
+  int<lower=0> N; 
+  int golfer[N];
+  vector[N] y;
+  int K;
+} 
 parameters {
-          real alpha; // intercept;
-          vector[K] beta; // coefficient for predictor - will be 2 rows
-          real<lower=0.00001> sigma;
+  vector[K] a;
+  real mu_a;
+  real<lower=0.00001> sigma_a;
+  real<lower=0.00001> sigma_y;
+} 
+transformed parameters {
+  vector[N] y_hat;
+  for (i in 1:N)
+    y_hat[i] = a[golfer[i]];
 }
-
 model {
-     // specify matrix X before Beta coefficients
-     // can't do vector*matrix but can do matrix*vector
-     // result of X*beta is N rows [N,K]*[K] = N
-     y ~ normal(alpha + X * beta, sigma);  // likelihood
-     
-}
+  // Set priors
+  mu_a ~ normal(0, 10);
+  sigma_a ~ normal(0, 10);
+  sigma_y ~ normal(0, 10);
+  
+  // Coefficient for each golfer
+  a ~ normal (mu_a, sigma_a);
+  
+  // Likelihood
+  y ~ normal(y_hat, sigma_y);
+}"""
 
-"""
+partial_pool_data = {'N': len(observed_round_score),
+               'golfer': observed_golfers,
+               'y': observed_round_score,
+               'K':num_golfers}
+
 
 # Create Model - this will help with recompilation issues
-stan_model = pystan.StanModel(model_code=my_code)
+stan_model = pystan.StanModel(model_code=partial_pooling)
 
 # Call sampling function with data as argument
-fit = stan_model.sampling(data=my_data, iter=2000, chains=4, seed=1,warmup=1000)
+fit = stan_model.sampling(data=partial_pool_data, iter=2000, chains=4, seed=1,warmup=1000)
 
 # Put Posterior draws into a dictionary
 params = fit.extract()
