@@ -132,30 +132,44 @@ partial_pooling = """
 data {
   int<lower=0> N; 
   int golfer[N];
+  int course[N];
   vector[N] y;
   int K;
+  int J;
 } 
 parameters {
+// golfer parameters
   vector[K] a;
   real mu_a;
   real<lower=0.00001> sigma_a;
+// course parameters
+  vector[J] b;
+  real mu_b;
+  real<lower=0.00001> sigma_b;
+// residual error
   real<lower=0.00001> sigma_y;
 } 
 transformed parameters {
   vector[N] y_hat;
   for (i in 1:N)
-    y_hat[i] = a[golfer[i]];
+    y_hat[i] = a[golfer[i]] + b[course[i]];
 }
 model {
   // Set priors
   mu_a ~ normal(0, 10);
   // variability of golfer means
   sigma_a ~ normal(0, 10);
+  // course priors
+   mu_b ~ normal(0, 10);
+  // variability of course means
+  sigma_b ~ normal(0, 10);
   // residual error of observations
   sigma_y ~ normal(0, 10);
   
   // Coefficient for each golfer
   a ~ normal (mu_a, sigma_a);
+  // Coefficient for each course
+  b ~ normal (mu_b, sigma_b);
   
   // Likelihood
   y ~ normal(y_hat, sigma_y);
@@ -164,14 +178,16 @@ model {
 partial_pool_data = {'N': len(observed_round_score),
                'golfer': observed_golfers,
                'y': observed_round_score,
-               'K':num_golfers}
+               'course': observed_courses,
+               'K':num_golfers,
+               'J':num_courses}
 
 
 # Create Model - this will help with recompilation issues
 stan_model = pystan.StanModel(model_code=partial_pooling)
 
 # Call sampling function with data as argument
-fit = stan_model.sampling(data=partial_pool_data, iter=2000, chains=4, seed=1,warmup=1000)
+fit = stan_model.sampling(data=partial_pool_data, iter=4000, chains=4, seed=1,warmup=2000)
 
 # Put Posterior draws into a dictionary
 params = fit.extract()
