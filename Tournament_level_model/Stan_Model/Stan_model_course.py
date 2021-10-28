@@ -130,41 +130,53 @@ num_courses_test = len(tournament_r1.i_course.drop_duplicates())
 
 partial_pooling = """
 data {
-  int<lower=0> N; 
+  int<lower=0> N; //number of rows in training set
   int golfer[N];
   int course[N];
   vector[N] y;
-  int K;
-  int J;
+  int K; //num golfers
+  int J; //num courses
+  int L; //num rows in pred set
+  int golfer_pred[L];
+  int course_pred[L];
+  
 } 
 parameters {
 // golfer parameters
   vector[K] a;
   real mu_a;
   real<lower=0.00001> sigma_a;
+  
 // course parameters
   vector[J] b;
   real mu_b;
   real<lower=0.00001> sigma_b;
+  
 // residual error
   real<lower=0.00001> sigma_y;
 } 
 transformed parameters {
   vector[N] y_hat;
-  for (i in 1:N)
+  vector[L] y_hat_pred;
+  
+for (i in 1:N)
     y_hat[i] = a[golfer[i]] + b[course[i]];
-}
+
+for (i in 1:L)
+    y_hat_pred[i] = a[golfer_pred[i]] + b[course_pred[i]];
+    }
+
 model {
   // Set priors
-  mu_a ~ normal(0, 10);
+  mu_a ~ normal(0, 3);
   // variability of golfer means
-  sigma_a ~ normal(0, 10);
+  sigma_a ~ normal(0, 3);
   // course priors
-   mu_b ~ normal(0, 10);
+   mu_b ~ normal(0, 3);
   // variability of course means
-  sigma_b ~ normal(0, 10);
+  sigma_b ~ normal(0, 3);
   // residual error of observations
-  sigma_y ~ normal(0, 10);
+  sigma_y ~ normal(0, 3);
   
   // Coefficient for each golfer
   a ~ normal (mu_a, sigma_a);
@@ -173,14 +185,25 @@ model {
   
   // Likelihood
   y ~ normal(y_hat, sigma_y);
-}"""
+}
+
+generated quantities {
+  vector[L] y_pred;
+  for (i in 1:L)
+  y_pred[i] = normal_rng(y_hat_pred[i], sigma_y);
+}
+
+"""
 
 partial_pool_data = {'N': len(observed_round_score),
                'golfer': observed_golfers,
                'y': observed_round_score,
                'course': observed_courses,
                'K':num_golfers,
-               'J':num_courses}
+               'J':num_courses,
+               'L':len(observed_golfers_test),
+               'golfer_pred':observed_golfers_test,
+               'course_pred':observed_courses_test }
 
 
 # Create Model - this will help with recompilation issues
@@ -199,4 +222,9 @@ summary_dict = fit.summary()
 trace_summary = pd.DataFrame(summary_dict['summary'], 
                   columns=summary_dict['summary_colnames'], 
                   index=summary_dict['summary_rownames'])
+
+
+sample_trace = fit['a']
+
+
 
