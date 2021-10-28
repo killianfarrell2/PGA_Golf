@@ -132,7 +132,7 @@ data {
   int<lower=0> N; //number of rows in training set
   int golfer[N];
   int course[N];
-  vector[N] y;
+  int y[N];
   int K; //num golfers
   int J; //num courses
   int L; //num rows in pred set
@@ -151,52 +151,51 @@ parameters {
   real mu_b;
   real<lower=0.00001> sigma_b;
   
-// residual error
-  real<lower=0.00001> sigma_y;
 } 
 transformed parameters {
   vector[N] y_hat;
   vector[L] y_hat_pred;
   
 for (i in 1:N)
-    y_hat[i] = a[golfer[i]] + b[course[i]];
+    y_hat[i] = exp(a[golfer[i]] + b[course[i]]);
 
 for (i in 1:L)
-    y_hat_pred[i] = a[golfer_pred[i]] + b[course_pred[i]];
+    y_hat_pred[i] = exp(a[golfer_pred[i]] + b[course_pred[i]]);
     }
 
 model {
   // Set priors
-  mu_a ~ normal(0, 1);
+  mu_a ~ normal(0, 0.1);
   // variability of golfer means
   sigma_a ~ normal(0, 1);
   // course priors
-   mu_b ~ normal(0, 1);
+   mu_b ~ normal(0, 0.1);
   // variability of course means
   sigma_b ~ normal(0, 1);
-  // residual error of observations
-  sigma_y ~ normal(0, 3);
-  
+
   // Coefficient for each golfer
   a ~ normal (mu_a, sigma_a);
   // Coefficient for each course
   b ~ normal (mu_b, sigma_b);
   
   // Likelihood
-  y ~ normal(y_hat, sigma_y);
+  y ~ poisson(y_hat);
 }
 
 generated quantities {
-  vector[L] y_pred;
+  // subtract randomly generated number from 18
+  int y_pred[L];
   for (i in 1:L)
-  y_pred[i] = normal_rng(y_hat_pred[i], sigma_y);
+  y_pred[i] = poisson_rng(y_hat_pred[i]) - 18;
 }
 
 """
-
+# Use a shifted Poisson by adding 18 to each round score
+# -1 will be 17
+# when generating, 19 - 18 will be +1
 partial_pool_data = {'N': len(observed_round_score),
                'golfer': observed_golfers,
-               'y': observed_round_score,
+               'y': (18 + observed_round_score),
                'course': observed_courses,
                'K':num_golfers,
                'J':num_courses,
@@ -209,9 +208,8 @@ partial_pool_data = {'N': len(observed_round_score),
 stan_model = pystan.StanModel(model_code=partial_pooling)
 
 
-
 # Call sampling function with data as argument
-fit = stan_model.sampling(data=partial_pool_data, iter=4000, chains=4, seed=1,warmup=2000,control=dict(adapt_delta=0.99,max_treedepth=10))
+fit = stan_model.sampling(data=partial_pool_data, iter=4000, chains=4, seed=1,warmup=2000,control=dict(adapt_delta=0.90))
 
 # check divergences
 pystan.check_hmc_diagnostics(fit)
