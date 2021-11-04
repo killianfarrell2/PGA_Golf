@@ -126,76 +126,44 @@ num_golfers_test = len(tournament_r1.i_golfer.drop_duplicates())
 num_courses = len(training_data.i_course.drop_duplicates())
 num_courses_test = len(tournament_r1.i_course.drop_duplicates())
 
-
+# Course affect should be intercept term
+# Only want to group together observations from the same course
+# Arrays are for ints 
+# Model keeps all courses separate at intercept
+# Courses do not have a relationship between them
 partial_pooling = """
 data {
   int<lower=0> N; //number of rows in training set
-  int golfer[N];
   int course[N];
-  int y[N];
-  int K; //num golfers
-  int J; //num courses
-  int L; //num rows in pred set
-  int golfer_pred[L];
-  int course_pred[L];
-  
+  vector[N] y;
+  int J; //num courses  
 } 
-parameters {
-// golfer parameters
-  vector[K] a;
-  real mu_a;
-  real<lower=0.00001> sigma_a;
-  
-// course parameters
+parameters {  
+// course parameter - no mean and sigma for group
   vector[J] b;
-  real mu_b;
-  real<lower=0.00001> sigma_b;
-  
+
+// residual error in likelihood
+  real<lower=0.00001> sigma_y;
 } 
+
 transformed parameters {
   vector[N] y_hat;
-  vector[L] y_hat_pred;
-  
-for (i in 1:N)
-    y_hat[i] = exp(a[golfer[i]] + b[course[i]]);
 
-for (i in 1:L)
-    y_hat_pred[i] = exp(a[golfer_pred[i]] + b[course_pred[i]]);
-    }
+for (i in 1:N)
+    y_hat[i] = b[course[i]];}
 
 model {
-  // Set priors
-  mu_a ~ normal(0, 0.1);
-  // variability of golfer means
-  sigma_a ~ normal(0, 1);
-  // course priors
-   mu_b ~ normal(0, 0.1);
-  // variability of course means
-  sigma_b ~ normal(0, 1);
-
-  // Coefficient for each golfer
-  a ~ normal (mu_a, sigma_a);
-  // Coefficient for each course
-  b ~ normal (mu_b, sigma_b);
-  
-  // Likelihood
-  y ~ poisson(y_hat);
+    // Likelihood
+    y ~ normal(y_hat, sigma_y);
 }
 
-generated quantities {
-  // subtract randomly generated number from 18
-  int y_pred[L];
-  for (i in 1:L)
-  y_pred[i] = poisson_rng(y_hat_pred[i]) - 18;
-}
 
 """
-# Use a shifted Poisson by adding 18 to each round score
-# -1 will be 17
-# when generating, 19 - 18 will be +1
+
+
 partial_pool_data = {'N': len(observed_round_score),
                'golfer': observed_golfers,
-               'y': (18 + observed_round_score),
+               'y': observed_round_score,
                'course': observed_courses,
                'K':num_golfers,
                'J':num_courses,
@@ -207,13 +175,11 @@ partial_pool_data = {'N': len(observed_round_score),
 # Create Model - this will help with recompilation issues
 stan_model = pystan.StanModel(model_code=partial_pooling)
 
-
 # Call sampling function with data as argument
-fit = stan_model.sampling(data=partial_pool_data, iter=4000, chains=4, seed=1,warmup=2000,control=dict(adapt_delta=0.90))
+fit = stan_model.sampling(data=partial_pool_data, iter=4000, chains=4, seed=1,warmup=2000,control=dict(adapt_delta=0.99,max_treedepth=10))
 
 # check divergences
 pystan.check_hmc_diagnostics(fit)
-
 
 # Put Posterior draws into a dictionary
 params = fit.extract()
@@ -226,17 +192,4 @@ summary_dict = fit.summary()
 trace_summary = pd.DataFrame(summary_dict['summary'], 
                   columns=summary_dict['summary_colnames'], 
                   index=summary_dict['summary_rownames'])
-
-
-sample_trace = fit['a']
-
-# Plot graphs
-fit.plot('y_pred[2]');
-
-
-
-# Diagnostics on test set
-# How to check accuracy - poisson output vs actual score
-
-
 
