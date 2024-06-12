@@ -30,7 +30,6 @@ subset_players = ['Sungjae Im','Brian Stuard',
 # Filter out 10 golfers
 data = data[data["player"].isin(subset_players)]
 
-
 #Split into training data with rough 80:20 split
 # Select subset of data for training diagnostics
 training_data = data[data['date'] <'2020-10-01']
@@ -108,10 +107,9 @@ observed_golfers = training_data.i_golfer.values
 observed_golfers_test = tournament_r1.i_golfer.values
 
 # Get observed scores to use for model
-# Changed this to overall score rather than to par
-observed_round_score = training_data.Round_total.values
+observed_round_score = training_data.Round_Score.values
 # Get observed scores to use for model
-observed_round_score_test = tournament_r1.Round_total.values
+observed_round_score_test = tournament_r1.Round_Score.values
 
 #Set values to be used as x
 observed_courses = training_data.i_course.values
@@ -127,84 +125,72 @@ num_golfers_test = len(tournament_r1.i_golfer.drop_duplicates())
 num_courses = len(training_data.i_course.drop_duplicates())
 num_courses_test = len(tournament_r1.i_course.drop_duplicates())
 
-# Adding intercept term - model did not run
-partial_pooling = """
+# Course affect not hierarchical (no link between courses)
+# Player affect is hierarchical
+
+model_code = """
 data {
   int<lower=0> N; //number of rows in training set
+  vector[N] y;
   int golfer[N];
-  int course[N];
-  int y[N];
-  int K; //num golfers
-  int J; //num courses
-  int L; //num rows in pred set
-  int golfer_pred[L];
-  int course_pred[L];
-  
+  int L; //num golfers
+
+  int D; //num courses 
+  row_vector[D] x[N]; // this will be multipled by beta
+
 } 
-parameters {
-// golfer parameters
-  vector[K] a_player;
-  real mu_a;
-  real<lower=0.00001> sigma_a;
-  
-// course parameters - no mean and sigma - keep each course separate
-  vector[J] b_course;
- 
+parameters {   
+  real mu[D];
+  real<lower=0.0001> sigma[D];
+  vector[D] beta[L];
+
+// residual error in likelihood
+  real<lower=0.00001> sigma_y;
 } 
+
 transformed parameters {
   vector[N] y_hat;
-  vector[L] y_hat_pred;
-  
+
 for (i in 1:N)
-    y_hat[i] = exp(a_player[golfer[i]] + b_course[course[i]]);
+    y_hat[i] = x[i] * beta[golfer[i]]
 
-for (i in 1:L)
-    y_hat_pred[i] = exp(a_player[golfer_pred[i]] + b_course[course_pred[i]]);
-    }
+  }
 
-model {
-  // Set priors
-  mu_a ~ normal(0, 100);
-  // variability of player means
-  sigma_a ~ normal(0, 100);
-  
-
-  // Coefficient for each golfer
-  a_player ~ normal (mu_a, sigma_a);
- 
-  // Likelihood
-  y ~ poisson(y_hat);
+model {  
+     // For course
+    for (d in 1:D) {
+    mu[d] ~ normal(0, 100);
+    // for golfer
+    for (l in 1:L)
+      beta[l,d] ~ normal(mu[d], sigma[d]);
+  }
+         
+    // Likelihood
+    y ~ normal(y_hat, sigma_y);
 }
 
-generated quantities {
-  int y_pred[L];
-  for (i in 1:L)
-  y_pred[i] = poisson_rng(y_hat_pred[i]);
-}
+
 
 """
 
-partial_pool_data = {'N': len(observed_round_score),
+
+model_data = {'N': len(observed_round_score),
                'golfer': observed_golfers,
-               'y': (observed_round_score),
+               'y': observed_round_score,
+               'x': vector,
                'course': observed_courses,
-               'K':num_golfers,
-               'J':num_courses,
-               'L':len(observed_golfers_test),
-               'golfer_pred':observed_golfers_test,
-               'course_pred':observed_courses_test }
+               'L':num_golfers,
+               'D':num_courses }
 
 
 # Create Model - this will help with recompilation issues
-stan_model = pystan.StanModel(model_code=partial_pooling)
-
+stan_model = pystan.StanModel(model_code=model_code)
 
 # Call sampling function with data as argument
-fit = stan_model.sampling(data=partial_pool_data, iter=2000, chains=4, seed=1,warmup=1000,control=dict(adapt_delta=0.99,max_treedepth=15))
+fit = stan_model.sampling(data=model_data, iter=4000, chains=4, seed=1,warmup=2000,control=dict(adapt_delta=0.99,max_treedepth=10))
 
 # check divergences
 pystan.check_hmc_diagnostics(fit)
-
 
 # Put Posterior draws into a dictionary
 params = fit.extract()
@@ -217,16 +203,6 @@ summary_dict = fit.summary()
 trace_summary = pd.DataFrame(summary_dict['summary'], 
                   columns=summary_dict['summary_colnames'], 
                   index=summary_dict['summary_rownames'])
-
-
-# Standard deviation for predicted scores was 9
-# Mean prediction was 72 
-# sqrt 72 is 8.48
-# 2.5% score was 55
-# 97.5% was 91
-# Standard deviation is too large (-18 to +18) for 95% of scores
-# Poisson Model not appropriate with current set up
-# Normal distribution can be used with continuity correction
 
 
 
