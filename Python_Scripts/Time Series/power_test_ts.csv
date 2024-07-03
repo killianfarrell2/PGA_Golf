@@ -1,0 +1,39 @@
+player,n_rounds,made_cut,tournament name,course,purse,Finish,Round_Score,Round_total,Avg_Score,Round_sg,pred,resid,date_round
+Seamus Power,2,0,The RSM Classic,"Sea Island Resort - Sea Island, GA",6.6,CUT,3,75,70.0,-5.0,1.25,-6.25,2019-11-21
+Seamus Power,2,0,The RSM Classic,"Sea Island Resort - Sea Island, GA",6.6,CUT,-5,65,68.79,3.79,1.21,2.58,2019-11-22
+Seamus Power,4,1,AT&T Pebble Beach Pro-Am,"Pebble Beach Resort - Pebble Beach, CA",7.8,T38,0,72,71.21,-0.79,1.2,-1.99,2020-02-05
+Seamus Power,4,1,AT&T Pebble Beach Pro-Am,"Pebble Beach Resort - Pebble Beach, CA",7.8,T38,-4,68,70.87,2.87,1.24,1.63,2020-02-06
+Seamus Power,4,1,AT&T Pebble Beach Pro-Am,"Pebble Beach Resort - Pebble Beach, CA",7.8,T38,0,71,71.92,0.92,1.09,-0.17,2020-02-07
+Seamus Power,4,1,AT&T Pebble Beach Pro-Am,"Pebble Beach Resort - Pebble Beach, CA",7.8,T38,2,74,74.43,0.43,1.14,-0.71,2020-02-08
+Seamus Power,4,1,Puerto Rico Open,"Grand Reserve Country Club - Rio Grande, Puerto Rico",3.0,,1,73,71.0,-2.0,1.24,-3.24,2020-02-19
+Seamus Power,4,1,Puerto Rico Open,"Grand Reserve Country Club - Rio Grande, Puerto Rico",3.0,,-3,69,70.52,1.52,1.16,0.36,2020-02-20
+Seamus Power,4,1,Puerto Rico Open,"Grand Reserve Country Club - Rio Grande, Puerto Rico",3.0,,-3,69,69.74,0.74,1.14,-0.4,2020-02-21
+Seamus Power,4,1,Puerto Rico Open,"Grand Reserve Country Club - Rio Grande, Puerto Rico",3.0,,-4,68,69.9,1.9,1.34,0.56,2020-02-22
+Seamus Power,4,1,Rocket Mortgage Classic,"Detroit Golf Club - Detroit, MI",7.5,T12,-5,67,70.17,3.17,1.11,2.06,2020-07-02
+Seamus Power,4,1,Rocket Mortgage Classic,"Detroit Golf Club - Detroit, MI",7.5,T12,-6,66,70.01,4.01,1.31,2.7,2020-07-03
+Seamus Power,4,1,Rocket Mortgage Classic,"Detroit Golf Club - Detroit, MI",7.5,T12,-3,69,69.5,0.5,1.15,-0.65,2020-07-04
+Seamus Power,4,1,Rocket Mortgage Classic,"Detroit Golf Club - Detroit, MI",7.5,T12,0,72,70.44,-1.56,1.08,-2.64,2020-07-05
+Seamus Power,2,0,3M Open,"TPC Twin Cities - Blaine, MN",6.6,CUT,-3,68,70.39,2.39,1.19,1.2,2020-07-23
+Seamus Power,2,0,3M Open,"TPC Twin Cities - Blaine, MN",6.6,CUT,7,78,70.71,-7.29,1.16,-8.45,2020-07-24
+Seamus Power,4,1,Wyndham Championship,"Sedgefield Country Club - Greensboro, NC",6.4,T27,-2,68,69.33,1.33,1.23,0.1,2020-08-13
+Seamus Power,4,1,Wyndham Championship,"Sedgefield Country Club - Greensboro, NC",6.4,T27,-1,69,68.7,-0.3,1.27,-1.57,2020-08-14
+Seamus Power,4,1,Wyndham Championship,"Sedgefield Country Club - Greensboro, NC",6.4,T27,-3,67,67.81,0.81,1.23,-0.42,2020-08-15
+Seamus Power,4,1,Wyndham Championship,"Sedgefield Country Club - Greensboro, NC",6.4,T27,-4,66,68.79,2.79,1.23,1.56,2020-08-16
+Seamus Power,2,0,Safeway Open,"Silverado Resort - Napa, CA",6.6,,3,75,70.59,-4.41,1.26,-5.67,2020-09-10
+Seamus Power,2,0,Safeway Open,"Silverado Resort - Napa, CA",6.6,,-1,71,69.99,-1.01,1.22,-2.23,2020-09-11
+Seamus Power,2,0,Corales Puntacana Resort & Club Championship,"Corales Puntacana GC - Punta Cana, Dominican Republic",4.0,,-2,70,70.67,0.67,1.22,-0.55,2020-09-24
+Seamus Power,2,0,Corales Puntacana Resort & Club Championship,"Corales Puntacana GC - Punta Cana, Dominican Republic",4.0,,1,73,71.04,-1.96,1.17,-3.13,2020-09-25
+Seamus Power,4,1,Bermuda Championship,"Port Royal GC - Southampton Parish, Bermuda",4.0,,-2,69,69.72,0.72,1.35,-0.63,2020-10-29
+Seamus Power,4,1,Bermuda Championship,"Port Royal GC - Southampton Parish, Bermuda",4.0,,3,74,73.45,-0.55,1.24,-1.79,2020-10-30
+Seamus Power,4,1,Bermuda Championship,"Port Royal GC - Southampton Parish, Bermuda",4.0,,-3,68,70.17,2.17,1.29,0.88,2020-10-31
+Seamus Power,4,1,Bermuda Championship,"Port Royal GC - Southampton Parish, Bermuda",4.0,,-2,69,69.11,0.11,1.09,-0.98,2020-11-01
+Seamus Power,2,0,Sony Open in Hawaii,"Waialae CC - Honolulu, HI",6.6,CUT,0,70,68.19,-1.81,1.2,-3.01,2021-01-14
+Seamus Power,2,0,Sony Open in Hawaii,"Waialae CC - Honolulu, HI",6.6,CUT,-2,68,68.43,0.43,1.2,-0.77,2021-01-15
+Seamus Power,2,0,Farmers Insurance Open,"Torrey Pines North - La Jolla, CA",7.5,CUT,6,78,71.23,-6.77,1.18,-7.95,2021-01-28
+Seamus Power,2,0,Farmers Insurance Open,"Torrey Pines North - La Jolla, CA",7.5,CUT,3,75,72.81,-2.19,1.24,-3.43,2021-01-29
+Seamus Power,2,0,AT&T Pebble Beach Pro-Am,"Pebble Beach Resort - Pebble Beach, CA",7.8,CUT,0,72,71.07,-0.93,1.24,-2.17,2021-02-11
+Seamus Power,2,0,AT&T Pebble Beach Pro-Am,"Pebble Beach Resort - Pebble Beach, CA",7.8,CUT,0,72,72.6,0.6,1.19,-0.59,2021-02-12
+Seamus Power,4,1,Puerto Rico Open,"Grand Reserve Country Club - Rio Grande, Puerto Rico",3.0,,-3,69,71.28,2.28,1.22,1.06,2021-02-25
+Seamus Power,4,1,Puerto Rico Open,"Grand Reserve Country Club - Rio Grande, Puerto Rico",3.0,,-2,70,71.37,1.37,1.05,0.32,2021-02-26
+Seamus Power,4,1,Puerto Rico Open,"Grand Reserve Country Club - Rio Grande, Puerto Rico",3.0,,-5,67,70.91,3.91,1.04,2.87,2021-02-27
+Seamus Power,4,1,Puerto Rico Open,"Grand Reserve Country Club - Rio Grande, Puerto Rico",3.0,,0,72,69.56,-2.44,1.22,-3.66,2021-02-28
